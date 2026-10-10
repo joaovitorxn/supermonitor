@@ -23,10 +23,10 @@ Supermonitor é um app desktop para Windows 11 voltado a gamers. Ele oferece:
 
 ### Fora do escopo
 
-- Overlay em fullscreen exclusivo (exigiria injeção no processo do jogo).
+- Overlay em fullscreen exclusivo real (exigiria injeção no processo do jogo). Jogos DX11/DX12 em fullscreen com Fullscreen Optimizations do Windows 11 (flip model) mostram o overlay normalmente.
 - Injeção de DLL ou hook de `Present()`.
 - Pacote MSIX e Microsoft Store.
-- Idiomas além de PT-BR.
+- Idiomas além de EN-US.
 - Processo agente separado (arquitetura de processo único foi escolhida).
 
 ## 2. Decisões
@@ -44,7 +44,7 @@ Supermonitor é um app desktop para Windows 11 voltado a gamers. Ele oferece:
 | Gráficos | Controle próprio em Win2D |
 | MVVM | CommunityToolkit.Mvvm |
 | Configurações | JSON em `%LocalAppData%\Supermonitor\settings.json`, System.Text.Json com source generator |
-| Idioma da UI | PT-BR |
+| Idioma da UI | EN-US (textos da UI em inglês) |
 
 ## 3. Arquitetura
 
@@ -73,7 +73,7 @@ Dependências: `Supermonitor` → `Supermonitor.Core`, `Supermonitor.Overlay`. `
 
 ### 3.3 Provedores
 
-Cada provedor implementa `ISensorProvider` (`Initialize`, `Sample`, `IsAvailable`, `UnavailableReason`). Uma falha em um provedor nunca derruba o hub. A métrica afetada mostra "N/D" e o erro vai para o log.
+Cada provedor implementa `ISensorProvider` (`Initialize`, `Sample`, `IsAvailable`, `UnavailableReason`). Uma falha em um provedor nunca derruba o hub. A métrica afetada mostra "N/A" e o erro vai para o log.
 
 | Área | Fonte | Métricas |
 |---|---|---|
@@ -116,17 +116,19 @@ Cada provedor implementa `ISensorProvider` (`Initialize`, `Sample`, `IsAvailable
 
 `NavigationView` à esquerda com as páginas:
 
-1. **Visão geral**: grade de cards.
+Rótulos da UI em inglês.
+
+1. **Overview**: grade de cards.
 2. **CPU**: uso por núcleo, clocks, temperaturas, potência.
-3. **Memória**: composição da RAM, commit, top processos por RAM, botão "Limpar standby".
+3. **Memory**: composição da RAM, commit, top processos por RAM, botão "Clear standby".
 4. **GPU**: uso por engine, VRAM, temperaturas, clock, fan, potência, uso por processo.
-5. **Discos**: atividade e espaço por disco, temperatura.
-6. **Rede**: tráfego por adaptador, latência/jitter/perda.
-7. **Processos**: tabela ordenável por CPU, RAM, GPU.
-8. **Jogos**: lista de jogos detectados e perfis, configuração do Modo Jogo.
+5. **Disks**: atividade e espaço por disco, temperatura.
+6. **Network**: tráfego por adaptador, latência/jitter/perda.
+7. **Processes**: tabela ordenável por CPU, RAM, GPU.
+8. **Games**: lista de jogos detectados e perfis, configuração do Modo Jogo.
 9. **Benchmarks**: lista de sessões, gráfico de frametime, comparação entre sessões.
 10. **Overlay**: editor com preview ao vivo.
-11. **Configurações**: aparência, amostragem, unidades, hotkeys, inicialização, sensores.
+11. **Settings**: aparência, amostragem, unidades, hotkeys, inicialização, sensores.
 
 ### 4.2 Customização do dashboard
 
@@ -151,7 +153,7 @@ Controle `SparklineChart` e `TimeSeriesChart` próprios sobre Win2D `CanvasContr
 - Fundo: cor, opacidade, raio dos cantos, padding.
 - Mini-gráfico de frametime liga/desliga, largura e altura.
 - Taxa de atualização.
-- Presets: Mínimo (só FPS), Padrão, Completo. O usuário pode salvar presets próprios.
+- Presets: Minimal (só FPS), Default, Full. O usuário pode salvar presets próprios.
 - O editor mostra preview ao vivo usando o mesmo renderizador do overlay.
 
 ## 5. Recursos para gamers
@@ -192,7 +194,7 @@ Interface `IFrameLimiter` (`IsSupported`, `UnsupportedReason`, `Apply(int fps)`,
   - 0,1% low = FPS correspondente ao percentil 99,9 de frametime;
   - FPS mínimo e máximo, frametime médio e mediano;
   - stutters = frames com frametime maior que 2× a mediana móvel.
-- Saída em `Documentos\Supermonitor\Benchmarks\<jogo>_<data-hora>.csv` (frametimes, CPU/GPU uso e temperatura por segundo) + `.json` (resumo).
+- Saída em `Documents\Supermonitor\Benchmarks\<jogo>_<data-hora>.csv` (frametimes, CPU/GPU uso e temperatura por segundo) + `.json` (resumo).
 - Página Benchmarks: lista, gráfico de frametime, comparação lado a lado de sessões.
 
 ### 5.4 Hotkeys globais
@@ -226,10 +228,10 @@ Conflito de registro: a UI marca a hotkey como indisponível.
 
 | Situação | Comportamento |
 |---|---|
-| Driver PawnIO ausente | Métricas LHM mostram "N/D"; banner com botão para instalar |
+| Driver PawnIO ausente | Métricas LHM mostram "N/A"; banner com botão para instalar |
 | ADLX/NVAPI ausente ou sem suporte | Limitador desativado com o motivo |
-| Falha ao criar sessão ETW | FPS "N/D"; motivo na UI; nova tentativa a cada 30 s |
-| Contador PDH ausente | Métrica "N/D" |
+| Falha ao criar sessão ETW | FPS "N/A"; motivo na UI; nova tentativa a cada 30 s |
+| Contador PDH ausente | Métrica "N/A" |
 | Exceção em provedor | Capturada no hub, log, provedor marcado indisponível após 5 falhas seguidas |
 | Crash com alterações aplicadas | `pending-restore.json` restaurado no próximo início |
 | Hotkey já em uso | Marcada como indisponível na UI |
