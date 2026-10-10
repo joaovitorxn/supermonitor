@@ -1,6 +1,7 @@
 using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
+using Supermonitor.Core.Sensors.Memory;
 
 namespace Supermonitor.Tests.Hardware;
 
@@ -30,5 +31,18 @@ public class ProviderSmokeTests
         {
             Assert.InRange(store.GetLatest(MetricIds.CpuCoreUsage(core)), 0, 100);
         }
+    }
+
+    [Fact]
+    public void Memory_provider_reports_total_and_used()
+    {
+        using var provider = new MemoryProvider();
+        var store = SampleTwice(provider);
+
+        var total = store.GetLatest(MetricIds.MemoryTotal);
+        Assert.True(total > 1024f * 1024 * 1024);
+        Assert.InRange(store.GetLatest(MetricIds.MemoryUsed), 1, total);
+        Assert.InRange(store.GetLatest(MetricIds.MemoryUsage), 0, 100);
+        Assert.True(store.GetLatest(MetricIds.MemoryCommitted) > 0);
     }
 }
