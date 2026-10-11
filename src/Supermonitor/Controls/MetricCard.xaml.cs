@@ -190,6 +190,8 @@ public sealed partial class MetricCard : UserControl
         var target = VisualTreeHelper.FindElementsInHostCoordinates(position, root)
             .OfType<MetricCard>()
             .FirstOrDefault(card => !ReferenceEquals(card, this) && card.ViewModel is not null);
+        var hits = VisualTreeHelper.FindElementsInHostCoordinates(position, root).ToList();
+        Supermonitor.Core.Diagnostics.Log.Info($"DIAG reorder release at {position}: {hits.Count} hits, cards={hits.OfType<MetricCard>().Count()}, types={string.Join(",", hits.Take(8).Select(h => h.GetType().Name))}, target={target?.ViewModel?.MetricId ?? "none"}");
         if (target?.ViewModel is { } targetVm)
         {
             actions.MoveTo(vm.MetricId, targetVm.MetricId);

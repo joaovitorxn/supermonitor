@@ -105,6 +105,7 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
         }
 
         var to = DashboardEditor.MoveTo(Settings.Cards, metricId, target);
+        Supermonitor.Core.Diagnostics.Log.Info($"DIAG MoveTo {metricId} from {from} to {to} (target {targetMetricId})");
         if (to != from)
         {
             Cards.Move(from, to);

@@ -1,4 +1,6 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
 namespace Supermonitor.Controls;
@@ -17,7 +19,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
     private Size Place(NonVirtualizingLayoutContext context, double width, bool arrange)
     {
         double x = 0, y = 0, rowHeight = 0, usedWidth = 0;
-        foreach (var child in context.Children)
+        foreach (var child in InItemOrder(context.Children))
         {
             if (!arrange)
             {
@@ -43,5 +45,16 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
         }
 
         return new Size(double.IsInfinity(width) ? usedWidth : width, y + rowHeight);
+    }
+
+    // Children segue a ordem de criação dos elementos; depois de ObservableCollection.Move só o índice do item muda.
+    private static IEnumerable<UIElement> InItemOrder(IReadOnlyList<UIElement> children)
+    {
+        if (children.Count == 0 || VisualTreeHelper.GetParent(children[0]) is not ItemsRepeater repeater)
+        {
+            return children;
+        }
+
+        return children.OrderBy(repeater.GetElementIndex);
     }
 }
