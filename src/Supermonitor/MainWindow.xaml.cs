@@ -66,6 +66,9 @@ public sealed partial class MainWindow : Window
             case "overview":
                 ContentFrame.Navigate(typeof(OverviewPage), context);
                 break;
+            case "settings":
+                ContentFrame.Navigate(typeof(SettingsPage), context);
+                break;
         }
     }
 }

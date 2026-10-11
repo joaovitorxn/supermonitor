@@ -1,0 +1,23 @@
+<Page
+    x:Class="Supermonitor.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+            <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" />
+            <ComboBox x:Name="IntervalBox" Header="Update interval" MinWidth="200" SelectionChanged="OnIntervalChanged">
+                <ComboBoxItem Content="250 ms" />
+                <ComboBoxItem Content="500 ms" />
+                <ComboBoxItem Content="1 second" />
+                <ComboBoxItem Content="2 seconds" />
+            </ComboBox>
+            <StackPanel Spacing="4">
+                <TextBox x:Name="PingHostBox" Header="Ping host" Width="320" HorizontalAlignment="Left" LostFocus="OnPingHostLostFocus" />
+                <TextBlock x:Name="PingHostError" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows" Toggled="OnStartWithWindowsToggled" />
+            <TextBlock x:Name="AutostartError" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+            <ToggleSwitch x:Name="StartMinimizedSwitch" Header="Start minimized to the system tray" Toggled="OnStartMinimizedToggled" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>
