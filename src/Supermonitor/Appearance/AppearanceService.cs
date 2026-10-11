@@ -30,14 +30,25 @@ public static class AppearanceService
             _ => TitleBarTheme.UseDefaultAppMode,
         };
 
-        window.SystemBackdrop = settings.Backdrop switch
+        // Trocar o backdrop durante uma transição de tema derruba o CoreMessaging; só troca quando o tipo muda.
+        if (KindOf(window.SystemBackdrop) != settings.Backdrop)
         {
-            BackdropKind.MicaAlt => new MicaBackdrop { Kind = MicaKind.BaseAlt },
-            BackdropKind.Acrylic => new DesktopAcrylicBackdrop(),
-            BackdropKind.Solid => null,
-            _ => new MicaBackdrop(),
-        };
+            window.SystemBackdrop = settings.Backdrop switch
+            {
+                BackdropKind.MicaAlt => new MicaBackdrop { Kind = MicaKind.BaseAlt },
+                BackdropKind.Acrylic => new DesktopAcrylicBackdrop(),
+                BackdropKind.Solid => null,
+                _ => new MicaBackdrop(),
+            };
+        }
 
+        ApplySolidBackground(root, settings);
+        AccentPalette.Set(ResolveAccent(settings.AccentColor));
+    }
+
+    // Único ajuste que depende do tema efetivo; seguro para chamar de ActualThemeChanged.
+    public static void ApplySolidBackground(Panel root, AppSettings settings)
+    {
         if (settings.Backdrop == BackdropKind.Solid)
         {
             root.Background = new SolidColorBrush(root.ActualTheme == ElementTheme.Dark
@@ -48,9 +59,15 @@ public static class AppearanceService
         {
             root.ClearValue(Panel.BackgroundProperty);
         }
-
-        AccentPalette.Set(ResolveAccent(settings.AccentColor));
     }
+
+    private static BackdropKind KindOf(SystemBackdrop? backdrop) => backdrop switch
+    {
+        MicaBackdrop { Kind: MicaKind.BaseAlt } => BackdropKind.MicaAlt,
+        MicaBackdrop => BackdropKind.Mica,
+        DesktopAcrylicBackdrop => BackdropKind.Acrylic,
+        _ => BackdropKind.Solid,
+    };
 
     public static Color ResolveAccent(string? hex) =>
         ColorText.TryParseRgb(hex, out var r, out var g, out var b)

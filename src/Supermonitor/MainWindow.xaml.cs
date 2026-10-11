@@ -34,7 +34,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed += OnAppWindowChanged;
         AppearanceService.Apply(this, RootGrid, host.Settings.Current);
         AppearanceService.Changed += OnAppearanceChanged;
-        RootGrid.ActualThemeChanged += (_, _) => AppearanceService.Apply(this, RootGrid, _host.Settings.Current);
+        RootGrid.ActualThemeChanged += (_, _) => AppearanceService.ApplySolidBackground(RootGrid, _host.Settings.Current);
         Closed += (_, _) => AppearanceService.Changed -= OnAppearanceChanged;
 
         SettingsInfoBar.IsOpen = App.Current.ConsumeSettingsWarning();
