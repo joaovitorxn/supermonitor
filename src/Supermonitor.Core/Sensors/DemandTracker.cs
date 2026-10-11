@@ -4,6 +4,7 @@ public enum Demand
 {
     HardwareSensors,
     Processes,
+    FrameCapture,
 }
 
 public sealed class DemandTracker
