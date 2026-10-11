@@ -25,6 +25,8 @@ Observação: a memória não cai ao fechar a janela. O runtime WinUI 3 continua
 - Minimizar pausa a atualização; restaurar retoma.
 - Bandeja: abrir, fechar no X mantendo o processo, Exit encerra limpo (log "Supermonitor stopped").
 - Settings: intervalo, host de ping com validação, iniciar com o Windows, iniciar minimizado.
+- Segunda execução do exe traz a janela existente para a frente, sem segundo processo.
+- Ícone da bandeja volta sozinho após reiniciar o Windows Explorer.
 
 ## Desvios do plano
 
