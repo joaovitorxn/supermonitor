@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Supermonitor.Appearance;
 using Supermonitor.Core;
 using Supermonitor.Core.Diagnostics;
+using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Settings;
@@ -142,6 +143,21 @@ public sealed partial class MainWindow : Window
         {
             case "overview":
                 ContentFrame.Navigate(typeof(OverviewPage), context);
+                break;
+            case "cpu":
+                ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Cpu, "CPU"));
+                break;
+            case "memory":
+                ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Memory, "Memory"));
+                break;
+            case "gpu":
+                ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Gpu, "GPU"));
+                break;
+            case "disk":
+                ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Disk, "Disks"));
+                break;
+            case "network":
+                ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Network, "Network"));
                 break;
             case "settings":
                 ContentFrame.Navigate(typeof(SettingsPage), context);
