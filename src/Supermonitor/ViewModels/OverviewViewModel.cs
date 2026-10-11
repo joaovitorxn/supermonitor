@@ -17,9 +17,9 @@ public sealed class OverviewViewModel : IDisposable
         _host = host;
         _dispatcher = dispatcher;
         _isMinimized = isMinimized;
-        foreach (var id in host.Settings.Current.OverviewCards)
+        foreach (var card in host.Settings.Current.Cards)
         {
-            Cards.Add(new MetricCardViewModel(id, host.Metrics));
+            Cards.Add(new MetricCardViewModel(card.MetricId, host.Metrics));
         }
 
         RefreshNow();
