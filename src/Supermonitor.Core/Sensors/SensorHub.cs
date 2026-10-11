@@ -11,6 +11,7 @@ public sealed class SensorHub : IAsyncDisposable
     private readonly MetricStore _store;
     private readonly TimeProvider _time;
     private readonly Slot[] _slots;
+    private readonly DemandTracker _demand;
     private readonly CancellationTokenSource _cts = new();
     private PeriodicTimer? _timer;
     private Task? _loop;
@@ -21,9 +22,10 @@ public sealed class SensorHub : IAsyncDisposable
     private bool _handlerErrorLogged;
     private long _lastHandlerError;
 
-    public SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval)
+    public SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval, DemandTracker? demand = null)
     {
         _store = store;
+        _demand = demand ?? new DemandTracker();
         _time = time;
         _slots = providers.Select(p => new Slot(p)).ToArray();
         Interval = interval;
@@ -105,6 +107,17 @@ public sealed class SensorHub : IAsyncDisposable
         {
             if (!slot.Available)
             {
+                continue;
+            }
+
+            if (slot.Provider.RequiredDemand is { } required && !_demand.IsActive(required))
+            {
+                if (slot.HasSampled)
+                {
+                    _store.InvalidateOwner(slot.Provider.Name);
+                    slot.HasSampled = false;
+                }
+
                 continue;
             }
 

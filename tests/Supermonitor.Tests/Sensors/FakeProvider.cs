@@ -21,6 +21,8 @@ internal sealed class FakeProvider(string name) : ISensorProvider
 
     public ManualResetEventSlim? InitializeGate { get; init; }
 
+    public Demand? RequiredDemand { get; init; }
+
     public List<TimeSpan> Elapsed { get; } = [];
 
     public bool Disposed { get; private set; }

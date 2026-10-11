@@ -177,6 +177,49 @@ public class SensorHubTests
     }
 
     [Fact]
+    public void Provider_without_active_demand_is_not_sampled_and_reads_nan()
+    {
+        var store = new MetricStore(10);
+        var demand = new DemandTracker();
+        var provider = new FakeProvider("p") { RequiredDemand = Demand.Processes };
+        var hub = new SensorHub(store, [provider], new FakeTimeProvider(), TimeSpan.FromSeconds(1), demand);
+        hub.InitializeProviders();
+
+        hub.Tick();
+
+        Assert.Empty(provider.Elapsed);
+        Assert.True(float.IsNaN(store.GetLatest(provider.MetricId)));
+    }
+
+    [Fact]
+    public void Provider_samples_while_demand_is_active_and_restarts_elapsed_after_a_pause()
+    {
+        var store = new MetricStore(10);
+        var demand = new DemandTracker();
+        var time = new FakeTimeProvider();
+        var provider = new FakeProvider("p") { RequiredDemand = Demand.Processes };
+        var hub = new SensorHub(store, [provider], time, TimeSpan.FromSeconds(1), demand);
+        hub.InitializeProviders();
+
+        var lease = demand.Acquire(Demand.Processes);
+        hub.Tick();
+        time.Advance(TimeSpan.FromSeconds(1));
+        hub.Tick();
+        Assert.Equal(1, store.GetLatest(provider.MetricId));
+
+        lease.Dispose();
+        time.Advance(TimeSpan.FromSeconds(1));
+        hub.Tick();
+        Assert.True(float.IsNaN(store.GetLatest(provider.MetricId)));
+
+        using var again = demand.Acquire(Demand.Processes);
+        time.Advance(TimeSpan.FromSeconds(1));
+        hub.Tick();
+
+        Assert.Equal(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(1), TimeSpan.Zero }, provider.Elapsed);
+    }
+
+    [Fact]
     public async Task DisposeAsync_disposes_providers()
     {
         var provider = new FakeProvider("p");
