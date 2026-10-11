@@ -87,7 +87,7 @@ public sealed class OverlayRendererTests : IDisposable
 
         var doubled = _renderer.Render(Frame(2), Style(), 2);
 
-        // A métrica do DirectWrite arredonda por glifo; 10% de tolerância cobre isso.
+        // DirectWrite metrics round per glyph; a 10% tolerance covers that.
         Assert.InRange(doubled.Width, normalWidth * 2 * 0.9, normalWidth * 2 * 1.1);
         Assert.InRange(doubled.Height, normalHeight * 2 * 0.9, normalHeight * 2 * 1.1);
     }

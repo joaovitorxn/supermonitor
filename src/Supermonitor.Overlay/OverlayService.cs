@@ -9,8 +9,8 @@ using Supermonitor.Overlay.Interop;
 
 namespace Supermonitor.Overlay;
 
-// Dono da janela do overlay. Uma thread própria roda o laço de mensagens, desenha na taxa configurada
-// e só redesenha quando algum texto (ou o gráfico) mudou. Segura as leases de demanda enquanto visível.
+// Owns the overlay window. A dedicated thread runs the message loop, draws at the configured rate
+// and redraws only when some text (or the graph) changed. Holds the demand leases while visible.
 public sealed unsafe class OverlayService : IDisposable
 {
     private const nuint RenderTimerId = 1;
@@ -26,7 +26,7 @@ public sealed unsafe class OverlayService : IDisposable
     private nint _handle;
     private bool _disposed;
 
-    // Estado da thread do overlay.
+    // Overlay thread state.
     private Runtime _current = new(false, null, new OverlayStyle(), UnitOptions.Default, new Dictionary<string, MetricThreshold>());
     private OverlayWindow? _window;
     private OverlayRenderer? _renderer;
@@ -60,7 +60,7 @@ public sealed unsafe class OverlayService : IDisposable
         Changed?.Invoke();
     }
 
-    // Tira uma cópia das configurações (chamar na thread que as altera) e avisa a thread do overlay.
+    // Takes a copy of the settings (call on the thread that changes them) and notifies the overlay thread.
     public void Apply()
     {
         var settings = _host.Settings.Current;
@@ -142,7 +142,7 @@ public sealed unsafe class OverlayService : IDisposable
         }
         catch (Exception ex)
         {
-            // Um erro por vez no log: a 30 Hz, repetir a mesma falha inundaria o arquivo.
+            // One error at a time in the log: at 30 Hz, repeating the same failure would flood the file.
             if (!_failing)
             {
                 _failing = true;
@@ -231,7 +231,7 @@ public sealed unsafe class OverlayService : IDisposable
         _failing = false;
     }
 
-    // Monitor escolhido (ou o primário se sumiu); mudou de posição, tamanho ou DPI → redesenha.
+    // Chosen monitor (or the primary if it vanished); position, size or DPI changed → redraw.
     private void RefreshMonitor()
     {
         var resolved = MonitorCatalog.Resolve(MonitorCatalog.Enumerate(), _current.MonitorId);

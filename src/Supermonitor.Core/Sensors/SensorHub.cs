@@ -127,7 +127,7 @@ public sealed class SensorHub : IAsyncDisposable
                 continue;
             }
 
-            // Métricas que o provedor não reescrever nesta amostra (instância sumiu) viram NaN.
+            // Metrics the provider doesn't rewrite in this sample (instance vanished) become NaN.
             _store.InvalidateOwner(slot.Provider.Name);
             try
             {

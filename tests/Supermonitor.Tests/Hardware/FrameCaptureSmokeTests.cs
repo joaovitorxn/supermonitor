@@ -39,7 +39,7 @@ public class FrameCaptureSmokeTests
         }
 
         Assert.DoesNotContain(EtwPresentSource.SessionName, TraceEventSession.GetActiveSessionNames());
-        // O número depende de haver janelas animando; só registramos.
+        // The number depends on animating windows being present; we only log it.
         Console.WriteLine($"present events received in 3 s: {received}");
     }
 
@@ -51,7 +51,7 @@ public class FrameCaptureSmokeTests
             Assert.Skip("ETW needs an administrator process; run the test runner elevated.");
         }
 
-        // Simula um crash anterior: a sessão continua ativa depois que o processo "morre".
+        // Simulates a previous crash: the session stays active after the process "dies".
         var orphan = new TraceEventSession(EtwPresentSource.SessionName) { StopOnDispose = false };
         orphan.EnableProvider(new Guid("802ec45a-1e99-4b83-9920-87c98277ba9d"), TraceEventLevel.Informational, 0x8000000);
         orphan.Dispose();

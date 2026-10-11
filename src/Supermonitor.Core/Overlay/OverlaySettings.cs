@@ -57,9 +57,13 @@ public sealed class OverlayItemSettings
 
     public MetricThreshold? Threshold { get; set; }
 
+    // Custom label; null uses the metric's default name.
+    public string? CustomLabel { get; set; }
+
     public OverlayItemSettings Clone() => new()
     {
         Metric = Metric,
+        CustomLabel = CustomLabel,
         LabelColor = LabelColor,
         ValueColor = ValueColor,
         Threshold = Threshold is null ? null : new MetricThreshold { Warning = Threshold.Warning, Critical = Threshold.Critical },
@@ -73,6 +77,7 @@ public sealed class OverlayStyle
     public const string DefaultValueColor = "#FFFFFF";
     public const string DefaultBackgroundColor = "#000000";
     public const int DefaultRefreshHz = 4;
+    public const int MaxLabelLength = 24;
     private const int MaxOffset = 4000;
 
     public static IReadOnlyList<int> AllowedRefreshHz { get; } = [1, 2, 4, 10, 30];
@@ -154,6 +159,7 @@ public sealed class OverlayStyle
             : Items.Where(i => i is not null && Enum.IsDefined(i.Metric)).DistinctBy(i => i.Metric).ToList();
         foreach (var item in Items)
         {
+            item.CustomLabel = string.IsNullOrWhiteSpace(item.CustomLabel) ? null : item.CustomLabel.Trim()[..Math.Min(item.CustomLabel.Trim().Length, MaxLabelLength)];
             item.LabelColor = ValidColor(item.LabelColor);
             item.ValueColor = ValidColor(item.ValueColor);
             if (item.Threshold is { } threshold)

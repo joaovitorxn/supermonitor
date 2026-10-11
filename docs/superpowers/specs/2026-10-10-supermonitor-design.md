@@ -1,262 +1,262 @@
 # Supermonitor — Design
 
-Data: 2026-10-10
-Status: aprovado em conversa, aguardando revisão da spec
+Date: 2026-10-10
+Status: approved in conversation, awaiting spec review
 
-## 1. Objetivo
+## 1. Goal
 
-Supermonitor é um app desktop para Windows 11 voltado a gamers. Ele oferece:
+Supermonitor is a Windows 11 desktop app for gamers. It offers:
 
-- Dashboard detalhado de desempenho: CPU, RAM, GPU, discos, rede e processos.
-- Visualização customizável.
-- Overlay in-game customizável.
-- Limitador de FPS e recursos para gamers: Modo Jogo automático, benchmark de sessão, hotkeys globais, limpeza da standby list de RAM.
-- Consumo mínimo de recursos do próprio app.
+- Detailed performance dashboard: CPU, RAM, GPU, disks, network and processes.
+- Customizable visualization.
+- Customizable in-game overlay.
+- FPS limiter and gamer features: automatic Game Mode, session benchmark, global hotkeys, RAM standby list cleanup.
+- Minimal resource consumption by the app itself.
 
-### Critérios de sucesso
+### Success criteria
 
-1. Com o dashboard aberto e atualizando a cada 1 s, o app usa menos de 1% de CPU em um Ryzen 7 7800X3D.
-2. Com o dashboard fechado (só bandeja + overlay), o app usa menos de 0,3% de CPU.
-3. Valores de CPU, RAM, disco e rede batem com o Gerenciador de Tarefas (tolerância de ±2 pontos percentuais ou ±5%).
-4. O overlay mostra FPS e frametime reais de um jogo em modo janela ou borderless.
-5. O limitador de FPS funciona na GPU AMD RX 9070 XT do usuário.
+1. With the dashboard open and updating every 1 s, the app uses less than 1% CPU on a Ryzen 7 7800X3D.
+2. With the dashboard closed (tray + overlay only), the app uses less than 0.3% CPU.
+3. CPU, RAM, disk and network values match Task Manager (tolerance of ±2 percentage points or ±5%).
+4. The overlay shows real FPS and frametime from a game in windowed or borderless mode.
+5. The FPS limiter works on the user's AMD RX 9070 XT GPU.
 
-### Fora do escopo
+### Out of scope
 
-- Overlay em fullscreen exclusivo real (exigiria injeção no processo do jogo). Jogos DX11/DX12 em fullscreen com Fullscreen Optimizations do Windows 11 (flip model) mostram o overlay normalmente.
-- Injeção de DLL ou hook de `Present()`.
-- Pacote MSIX e Microsoft Store.
-- Idiomas além de EN-US.
-- Processo agente separado (arquitetura de processo único foi escolhida).
+- Overlay in true exclusive fullscreen (would require injection into the game process). DX11/DX12 games in fullscreen with Windows 11 Fullscreen Optimizations (flip model) show the overlay normally.
+- DLL injection or `Present()` hooking.
+- MSIX package and Microsoft Store.
+- Languages other than EN-US.
+- Separate agent process (a single-process architecture was chosen).
 
-## 2. Decisões
+## 2. Decisions
 
-| Tema | Decisão |
+| Topic | Decision |
 |---|---|
-| Arquitetura | Processo único WinUI 3 com ícone na bandeja |
-| Linguagem/runtime | C#, .NET 10, Windows App SDK (última estável), x64 |
-| Empacotamento | Unpackaged (`WindowsPackageType=None`), Windows App SDK self-contained |
-| Privilégio | `requireAdministrator` no manifest; autostart por tarefa agendada com "executar com privilégios mais altos" |
-| Sensores de hardware | LibreHardwareMonitorLib (driver assinado PawnIO) |
-| Limitador de FPS | Driver: ADLX (AMD) e NVAPI (NVIDIA); sem injeção |
-| Captura de FPS | Sessão ETW em tempo real (TraceEvent) |
-| Overlay | Janela Win32 layered, click-through, Direct2D/DirectWrite via Vortice |
-| Gráficos | Controle próprio em Win2D |
+| Architecture | Single WinUI 3 process with a tray icon |
+| Language/runtime | C#, .NET 10, Windows App SDK (latest stable), x64 |
+| Packaging | Unpackaged (`WindowsPackageType=None`), self-contained Windows App SDK |
+| Privilege | `requireAdministrator` in the manifest; autostart via scheduled task with "run with highest privileges" |
+| Hardware sensors | LibreHardwareMonitorLib (signed PawnIO driver) |
+| FPS limiter | Driver: ADLX (AMD) and NVAPI (NVIDIA); no injection |
+| FPS capture | Real-time ETW session (TraceEvent) |
+| Overlay | Layered, click-through Win32 window, Direct2D/DirectWrite via Vortice |
+| Charts | Custom Win2D control |
 | MVVM | CommunityToolkit.Mvvm |
-| Configurações | JSON em `%LocalAppData%\Supermonitor\settings.json`, System.Text.Json com source generator |
-| Idioma da UI | EN-US (textos da UI em inglês) |
+| Settings | JSON at `%LocalAppData%\Supermonitor\settings.json`, System.Text.Json with source generator |
+| UI language | EN-US (UI text in English) |
 
-## 3. Arquitetura
+## 3. Architecture
 
-### 3.1 Projetos
+### 3.1 Projects
 
 ```
 Supermonitor.sln
-├─ src/Supermonitor            WinUI 3: janelas, páginas, ViewModels, bandeja, controles de gráfico
-├─ src/Supermonitor.Core       Sem UI: sensores, SensorHub, FPS ETW, jogos, limitador, benchmark, RAM, hotkeys, configurações
-├─ src/Supermonitor.Overlay    Janela overlay Win32 + renderização Direct2D
-└─ tests/Supermonitor.Tests    xUnit para lógica do Core
+├─ src/Supermonitor            WinUI 3: windows, pages, ViewModels, tray, chart controls
+├─ src/Supermonitor.Core       No UI: sensors, SensorHub, ETW FPS, games, limiter, benchmark, RAM, hotkeys, settings
+├─ src/Supermonitor.Overlay    Win32 overlay window + Direct2D rendering
+└─ tests/Supermonitor.Tests    xUnit for Core logic
 ```
 
-Dependências: `Supermonitor` → `Supermonitor.Core`, `Supermonitor.Overlay`. `Supermonitor.Overlay` → `Supermonitor.Core`. `Supermonitor.Core` não depende de WinUI.
+Dependencies: `Supermonitor` → `Supermonitor.Core`, `Supermonitor.Overlay`. `Supermonitor.Overlay` → `Supermonitor.Core`. `Supermonitor.Core` does not depend on WinUI.
 
 ### 3.2 SensorHub
 
-- Uma thread de fundo com `PeriodicTimer`.
-- Três níveis de amostragem:
-  - **Rápido** (padrão 250 ms): agregação de FPS/frametime.
-  - **Normal** (padrão 1 s, configurável de 250 ms a 2 s): CPU, RAM, GPU, disco, rede.
-  - **Lento** (5 s): espaço em disco, lista de adaptadores, dados SMART.
-- Cada amostra é um struct gravado em um `RingBuffer<T>` pré-alocado. Histórico de 10 minutos. Nenhuma alocação por tick no caminho quente.
-- Consumidores (dashboard, overlay, Modo Jogo, benchmark) assinam um evento `SampleReady` e leem o último valor ou o histórico. O hub não conhece os consumidores.
-- Métricas caras só são amostradas quando algum consumidor as pede. Exemplos: lista de processos e uso por núcleo só com o dashboard visível; ETW só com jogo detectado ou overlay mostrando FPS.
+- One background thread with `PeriodicTimer`.
+- Three sampling tiers:
+  - **Fast** (default 250 ms): FPS/frametime aggregation.
+  - **Normal** (default 1 s, configurable from 250 ms to 2 s): CPU, RAM, GPU, disk, network.
+  - **Slow** (5 s): disk space, adapter list, SMART data.
+- Each sample is a struct written to a pre-allocated `RingBuffer<T>`. 10-minute history. No per-tick allocation on the hot path.
+- Consumers (dashboard, overlay, Game Mode, benchmark) subscribe to a `SampleReady` event and read the latest value or the history. The hub does not know the consumers.
+- Expensive metrics are only sampled when some consumer asks for them. Examples: process list and per-core usage only with the dashboard visible; ETW only with a detected game or an overlay showing FPS.
 
-### 3.3 Provedores
+### 3.3 Providers
 
-Cada provedor implementa `ISensorProvider` (`Initialize`, `Sample`, `IsAvailable`, `UnavailableReason`). Uma falha em um provedor nunca derruba o hub. A métrica afetada mostra "N/A" e o erro vai para o log.
+Each provider implements `ISensorProvider` (`Initialize`, `Sample`, `IsAvailable`, `UnavailableReason`). A failure in one provider never brings down the hub. The affected metric shows "N/A" and the error goes to the log.
 
-| Área | Fonte | Métricas |
+| Area | Source | Metrics |
 |---|---|---|
-| CPU | PDH `\Processor Information(*)\% Processor Utility` (consulta única em lote) | Uso total e por núcleo lógico |
-| CPU | LHM | Clock por núcleo, temperatura (Tctl/Tdie, CCD), potência do pacote, voltagem |
-| RAM | `GlobalMemoryStatusEx`, `GetPerformanceInfo`, `NtQuerySystemInformation(SystemMemoryListInformation)` | Em uso, disponível, standby, livre, modificada, commit, cache |
-| GPU | PDH `\GPU Engine(*)\Utilization Percentage`, `\GPU Adapter Memory(*)\*` | Uso por engine (3D, cópia, vídeo), uso por processo, VRAM dedicada e compartilhada |
-| GPU | LHM | Temperatura (edge, hotspot, memória), clock, fan (RPM e %), potência |
-| Disco | PDH `\PhysicalDisk(*)\*`, `DriveInfo` | Leitura/escrita por segundo, tempo ativo, fila, espaço livre |
-| Disco | LHM | Temperatura SMART |
-| Rede | `GetIfTable2` (deltas de `MIB_IF_ROW2`) | Upload/download por adaptador |
-| Rede | ICMP para host configurável (padrão `1.1.1.1`, a cada 2 s) | Latência, jitter, perda |
-| Processos | `NtQuerySystemInformation(SystemProcessInformation)` + PDH GPU por PID | Top N por CPU, RAM, GPU |
-| FPS | ETW: `Microsoft-Windows-DxgKrnl` (eventos de present/flip) e `Microsoft-Windows-DXGI` | FPS, frametime, por processo |
+| CPU | PDH `\Processor Information(*)\% Processor Utility` (single batched query) | Total and per-logical-core usage |
+| CPU | LHM | Per-core clock, temperature (Tctl/Tdie, CCD), package power, voltage |
+| RAM | `GlobalMemoryStatusEx`, `GetPerformanceInfo`, `NtQuerySystemInformation(SystemMemoryListInformation)` | In use, available, standby, free, modified, commit, cache |
+| GPU | PDH `\GPU Engine(*)\Utilization Percentage`, `\GPU Adapter Memory(*)\*` | Usage per engine (3D, copy, video), usage per process, dedicated and shared VRAM |
+| GPU | LHM | Temperature (edge, hotspot, memory), clock, fan (RPM and %), power |
+| Disk | PDH `\PhysicalDisk(*)\*`, `DriveInfo` | Reads/writes per second, active time, queue, free space |
+| Disk | LHM | SMART temperature |
+| Network | `GetIfTable2` (`MIB_IF_ROW2` deltas) | Upload/download per adapter |
+| Network | ICMP to a configurable host (default `1.1.1.1`, every 2 s) | Latency, jitter, loss |
+| Processes | `NtQuerySystemInformation(SystemProcessInformation)` + PDH GPU per PID | Top N by CPU, RAM, GPU |
+| FPS | ETW: `Microsoft-Windows-DxgKrnl` (present/flip events) and `Microsoft-Windows-DXGI` | FPS, frametime, per process |
 
-### 3.4 Captura de FPS
+### 3.4 FPS capture
 
-- Sessão ETW nomeada `Supermonitor-FPS`. Ao iniciar, o app para qualquer sessão órfã com esse nome.
-- Eventos DxgKrnl cobrem DX9–12, Vulkan e OpenGL. DXGI complementa para apps DXGI.
-- O alvo é o processo do jogo em primeiro plano. Frametime é o intervalo entre presents consecutivos do processo alvo.
-- `FrameTimeAggregator` (lógica pura, testável) recebe timestamps e produz FPS médio da janela, frametime atual e um buffer de frametimes para o mini-gráfico e o benchmark.
+- ETW session named `Supermonitor-FPS`. On startup, the app stops any orphan session with that name.
+- DxgKrnl events cover DX9–12, Vulkan and OpenGL. DXGI complements for DXGI apps.
+- The target is the foreground game process. Frametime is the interval between consecutive presents of the target process.
+- `FrameTimeAggregator` (pure, testable logic) receives timestamps and produces the window's average FPS, the current frametime and a frametime buffer for the mini-chart and the benchmark.
 
 ### 3.5 Overlay
 
-- Janela Win32 com `WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`. Não recebe cliques nem foco e não aparece no Alt+Tab.
-- Renderização: Direct2D desenha em um DIB 32 bits premultiplicado, depois `UpdateLayeredWindow`. Texto via DirectWrite com antialiasing em tons de cinza.
-- Redesenha só quando um valor exibido muda, limitado à taxa configurada (padrão 4 Hz; mini-gráfico de frametime até 30 Hz).
-- Funciona em jogos em janela e borderless. Fullscreen exclusivo fica fora do escopo.
+- Win32 window with `WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`. It receives no clicks or focus and does not appear in Alt+Tab.
+- Rendering: Direct2D draws into a premultiplied 32-bit DIB, then `UpdateLayeredWindow`. Text via DirectWrite with grayscale antialiasing.
+- Redraws only when a displayed value changes, capped at the configured rate (default 4 Hz; frametime mini-chart up to 30 Hz).
+- Works in windowed and borderless games. Exclusive fullscreen is out of scope.
 
-### 3.6 Ciclo de vida e consumo
+### 3.6 Lifecycle and consumption
 
-- Fechar a janela principal destrói a janela e mantém o app na bandeja.
-- Sem janela visível, o processo entra em EcoQoS (`SetProcessInformation` com `ProcessPowerThrottling`) e para a amostragem exclusiva do dashboard.
-- Build: ReadyToRun, Tiered PGO, GC de workstation não concorrente.
-- Instância única: um mutex nomeado. A segunda instância pede à primeira para abrir o dashboard e encerra.
+- Closing the main window destroys the window and keeps the app in the tray.
+- With no visible window, the process enters EcoQoS (`SetProcessInformation` with `ProcessPowerThrottling`) and stops dashboard-only sampling.
+- Build: ReadyToRun, Tiered PGO, non-concurrent workstation GC.
+- Single instance: a named mutex. The second instance asks the first to open the dashboard and exits.
 
 ## 4. Interface
 
-### 4.1 Navegação
+### 4.1 Navigation
 
-`NavigationView` à esquerda com as páginas:
+`NavigationView` on the left with the pages:
 
-Rótulos da UI em inglês.
+UI labels in English.
 
-1. **Overview**: grade de cards.
-2. **CPU**: uso por núcleo, clocks, temperaturas, potência.
-3. **Memory**: composição da RAM, commit, top processos por RAM, botão "Clear standby".
-4. **GPU**: uso por engine, VRAM, temperaturas, clock, fan, potência, uso por processo.
-5. **Disks**: atividade e espaço por disco, temperatura.
-6. **Network**: tráfego por adaptador, latência/jitter/perda.
-7. **Processes**: tabela ordenável por CPU, RAM, GPU.
-8. **Games**: lista de jogos detectados e perfis, configuração do Modo Jogo.
-9. **Benchmarks**: lista de sessões, gráfico de frametime, comparação entre sessões.
-10. **Overlay**: editor com preview ao vivo.
-11. **Settings**: aparência, amostragem, unidades, hotkeys, inicialização, sensores.
+1. **Overview**: card grid.
+2. **CPU**: per-core usage, clocks, temperatures, power.
+3. **Memory**: RAM composition, commit, top processes by RAM, "Clear standby" button.
+4. **GPU**: usage per engine, VRAM, temperatures, clock, fan, power, usage per process.
+5. **Disks**: activity and space per disk, temperature.
+6. **Network**: traffic per adapter, latency/jitter/loss.
+7. **Processes**: table sortable by CPU, RAM, GPU.
+8. **Games**: list of detected games and profiles, Game Mode configuration.
+9. **Benchmarks**: session list, frametime chart, comparison between sessions.
+10. **Overlay**: editor with live preview.
+11. **Settings**: appearance, sampling, units, hotkeys, startup, sensors.
 
-### 4.2 Customização do dashboard
+### 4.2 Dashboard customization
 
-- Cards: mostrar, ocultar e reordenar por arraste; tamanho compacto, normal ou grande.
-- Gráfico por card: linha, área ou barra.
-- Janela de histórico: 1, 5 ou 10 minutos.
-- Intervalo de atualização: 250 ms, 500 ms, 1 s ou 2 s.
-- Tema: claro, escuro ou do sistema. Cor de destaque. Fundo Mica, Acrylic ou sólido.
-- Unidades: bits ou bytes para rede; °C ou °F.
-- Limiares de cor por métrica (ex.: temperatura acima de 80 °C em vermelho).
+- Cards: show, hide and reorder by dragging; compact, normal or large size.
+- Chart per card: line, area or bar.
+- History window: 1, 5 or 10 minutes.
+- Update interval: 250 ms, 500 ms, 1 s or 2 s.
+- Theme: light, dark or system. Accent color. Background Mica, Acrylic or solid.
+- Units: bits or bytes for network; °C or °F.
+- Color thresholds per metric (e.g. temperature above 80 °C in red).
 
-### 4.3 Gráficos
+### 4.3 Charts
 
-Controle `SparklineChart` e `TimeSeriesChart` próprios sobre Win2D `CanvasControl`. Leem diretamente do ring buffer. Pontos são reaproveitados entre frames, sem alocação por desenho. O desenho para quando o controle não está visível.
+Custom `SparklineChart` and `TimeSeriesChart` controls on top of Win2D `CanvasControl`. They read directly from the ring buffer. Points are reused between frames, with no per-draw allocation. Drawing stops when the control is not visible.
 
-### 4.4 Customização do overlay
+### 4.4 Overlay customization
 
-- Monitor alvo e posição: 9 âncoras + deslocamento em pixels.
-- Métricas exibidas e ordem: FPS, frametime, 1% low, CPU uso/temp/clock/potência, GPU uso/temp/clock/potência/VRAM, RAM, rede, ping, relógio, estado do limitador.
-- Layout: horizontal, vertical ou compacto.
-- Fonte, tamanho, cor do rótulo e do valor por métrica, limiares de cor.
-- Fundo: cor, opacidade, raio dos cantos, padding.
-- Mini-gráfico de frametime liga/desliga, largura e altura.
-- Taxa de atualização.
-- Presets: Minimal (só FPS), Default, Full. O usuário pode salvar presets próprios.
-- O editor mostra preview ao vivo usando o mesmo renderizador do overlay.
+- Target monitor and position: 9 anchors + pixel offset.
+- Displayed metrics and order: FPS, frametime, 1% low, CPU usage/temp/clock/power, GPU usage/temp/clock/power/VRAM, RAM, network, ping, clock, limiter state.
+- Layout: horizontal, vertical or compact.
+- Font, size, label and value color per metric, color thresholds.
+- Background: color, opacity, corner radius, padding.
+- Frametime mini-chart on/off, width and height.
+- Update rate.
+- Presets: Minimal (FPS only), Default, Full. The user can save their own presets.
+- The editor shows a live preview using the same renderer as the overlay.
 
-## 5. Recursos para gamers
+## 5. Gamer features
 
-### 5.1 Limitador de FPS
+### 5.1 FPS limiter
 
-Interface `IFrameLimiter` (`IsSupported`, `UnsupportedReason`, `Apply(int fps)`, `Clear()`, `CurrentLimit`).
+`IFrameLimiter` interface (`IsSupported`, `UnsupportedReason`, `Apply(int fps)`, `Clear()`, `CurrentLimit`).
 
-- **AMD (`AdlxFrameLimiter`)**: carrega `amdadlx64.dll` instalado pelo driver e chama ADLX pela ABI C (vtables via ponteiros de função). Usa Frame Rate Target Control quando suportado; senão usa Radeon Chill com mínimo = máximo = limite. O limite é global do driver.
-- **NVIDIA (`NvapiFrameLimiter`)**: `nvapi64.dll`, Driver Settings (DRS), configuração `FRL_FPS` (0x10835002) no perfil da aplicação do jogo, ou no perfil base quando não há jogo. Marcado como experimental: sem hardware NVIDIA para teste.
-- Sem GPU suportada: limitador desativado com o motivo na UI.
-- Antes de alterar o driver, o app grava o valor original em `pending-restore.json`. Ao sair, ou ao iniciar após crash, restaura esse valor.
+- **AMD (`AdlxFrameLimiter`)**: loads `amdadlx64.dll` installed by the driver and calls ADLX through the C ABI (vtables via function pointers). Uses Frame Rate Target Control when supported; otherwise uses Radeon Chill with minimum = maximum = limit. The limit is global to the driver.
+- **NVIDIA (`NvapiFrameLimiter`)**: `nvapi64.dll`, Driver Settings (DRS), `FRL_FPS` setting (0x10835002) in the game's application profile, or in the base profile when there is no game. Marked experimental: no NVIDIA hardware for testing.
+- No supported GPU: limiter disabled with the reason shown in the UI.
+- Before changing the driver, the app writes the original value to `pending-restore.json`. On exit, or on startup after a crash, it restores that value.
 
-### 5.2 Modo Jogo
+### 5.2 Game Mode
 
-- **Detecção** (`GameDetector`, lógica testável): o processo em primeiro plano é jogo se:
-  1. estiver na lista de jogos do usuário; ou
-  2. o executável estiver em uma biblioteca Steam, Epic, GOG, EA ou Ubisoft conhecida; ou
-  3. o processo apresentar frames via ETW com janela cobrindo o monitor inteiro.
-  Lista de exclusão do usuário vence as regras 2 e 3. Jogos detectados pelas regras 2 e 3 entram na lista para o usuário confirmar.
-- **Perfil por jogo** com ações opcionais:
-  - plano de energia (ex.: Desempenho Máximo);
-  - prioridade do processo do jogo (Normal, Acima do normal, Alta);
-  - limite de FPS;
-  - limpar standby ao iniciar;
-  - mostrar overlay;
-  - iniciar benchmark automaticamente.
-- Perfil padrão usado para jogos sem perfil próprio.
-- Ao sair do jogo, todas as alterações são revertidas. O estado alterado também vai para `pending-restore.json`.
+- **Detection** (`GameDetector`, testable logic): the foreground process is a game if:
+  1. it is in the user's game list; or
+  2. the executable is in a known Steam, Epic, GOG, EA or Ubisoft library; or
+  3. the process presents frames via ETW with a window covering the entire monitor.
+  The user's exclusion list overrides rules 2 and 3. Games detected by rules 2 and 3 are added to the list for the user to confirm.
+- **Per-game profile** with optional actions:
+  - power plan (e.g. Ultimate Performance);
+  - game process priority (Normal, Above Normal, High);
+  - FPS limit;
+  - clear standby on start;
+  - show overlay;
+  - start benchmark automatically.
+- Default profile used for games without their own profile.
+- When the game exits, all changes are reverted. The changed state also goes to `pending-restore.json`.
 
-### 5.3 Benchmark de sessão
+### 5.3 Session benchmark
 
-- Início e fim por hotkey, pelo botão na UI ou pelo Modo Jogo.
-- Grava todos os frametimes do processo alvo em buffer pré-alocado que cresce em blocos.
-- `BenchmarkStatistics` (lógica pura) calcula:
-  - FPS médio = quantidade de frames / duração;
-  - 1% low = FPS correspondente ao percentil 99 de frametime;
-  - 0,1% low = FPS correspondente ao percentil 99,9 de frametime;
-  - FPS mínimo e máximo, frametime médio e mediano;
-  - stutters = frames com frametime maior que 2× a mediana móvel.
-- Saída em `Documents\Supermonitor\Benchmarks\<jogo>_<data-hora>.csv` (frametimes, CPU/GPU uso e temperatura por segundo) + `.json` (resumo).
-- Página Benchmarks: lista, gráfico de frametime, comparação lado a lado de sessões.
+- Start and end via hotkey, the UI button or Game Mode.
+- Records all frametimes of the target process in a pre-allocated buffer that grows in blocks.
+- `BenchmarkStatistics` (pure logic) computes:
+  - average FPS = frame count / duration;
+  - 1% low = FPS corresponding to the 99th percentile of frametime;
+  - 0.1% low = FPS corresponding to the 99.9th percentile of frametime;
+  - minimum and maximum FPS, average and median frametime;
+  - stutters = frames with frametime greater than 2× the moving median.
+- Output in `Documents\Supermonitor\Benchmarks\<game>_<date-time>.csv` (frametimes, CPU/GPU usage and temperature per second) + `.json` (summary).
+- Benchmarks page: list, frametime chart, side-by-side comparison of sessions.
 
-### 5.4 Hotkeys globais
+### 5.4 Global hotkeys
 
-`RegisterHotKey` em uma janela message-only. Ações configuráveis com padrões:
+`RegisterHotKey` on a message-only window. Configurable actions with defaults:
 
-| Ação | Padrão |
+| Action | Default |
 |---|---|
-| Mostrar/ocultar overlay | `Ctrl+Shift+O` |
-| Ligar/desligar limitador | `Ctrl+Shift+L` |
-| Iniciar/parar benchmark | `Ctrl+Shift+B` |
-| Limpar standby | `Ctrl+Shift+M` |
-| Abrir dashboard | `Ctrl+Shift+S` |
+| Show/hide overlay | `Ctrl+Shift+O` |
+| Turn limiter on/off | `Ctrl+Shift+L` |
+| Start/stop benchmark | `Ctrl+Shift+B` |
+| Clear standby | `Ctrl+Shift+M` |
+| Open dashboard | `Ctrl+Shift+S` |
 
-Conflito de registro: a UI marca a hotkey como indisponível.
+Registration conflict: the UI marks the hotkey as unavailable.
 
-### 5.5 Limpeza da standby list
+### 5.5 Standby list cleanup
 
-- `NtSetSystemInformation(SystemMemoryListInformation, MemoryPurgeStandbyList)` com o privilégio `SeProfileSingleProcessPrivilege` habilitado.
-- Manual: botão na página Memória e hotkey.
-- Automático (desligado por padrão): a cada 5 s, limpa se standby > X GB **e** livre < Y GB. Padrões: X = 1 GB, Y = 1 GB. Intervalo mínimo de 60 s entre limpezas.
+- `NtSetSystemInformation(SystemMemoryListInformation, MemoryPurgeStandbyList)` with the `SeProfileSingleProcessPrivilege` privilege enabled.
+- Manual: button on the Memory page and hotkey.
+- Automatic (off by default): every 5 s, cleans if standby > X GB **and** free < Y GB. Defaults: X = 1 GB, Y = 1 GB. Minimum interval of 60 s between cleanups.
 
-## 6. Configurações e persistência
+## 6. Settings and persistence
 
-- `AppSettings` com número de versão e migrações (`SettingsMigrator`, testável).
-- Gravação com debounce de 500 ms e escrita atômica (arquivo temporário + rename).
-- Arquivo corrompido: renomeado para `.bak` e o app usa os padrões, com aviso.
-- Logs em `%LocalAppData%\Supermonitor\logs`, rotação diária, 7 dias.
+- `AppSettings` with a version number and migrations (`SettingsMigrator`, testable).
+- Writes with 500 ms debounce and atomic write (temporary file + rename).
+- Corrupted file: renamed to `.bak` and the app uses the defaults, with a warning.
+- Logs in `%LocalAppData%\Supermonitor\logs`, daily rotation, 7 days.
 
-## 7. Tratamento de erros
+## 7. Error handling
 
-| Situação | Comportamento |
+| Situation | Behavior |
 |---|---|
-| Driver PawnIO ausente | Métricas LHM mostram "N/A"; banner com botão para instalar |
-| ADLX/NVAPI ausente ou sem suporte | Limitador desativado com o motivo |
-| Falha ao criar sessão ETW | FPS "N/A"; motivo na UI; nova tentativa a cada 30 s |
-| Contador PDH ausente | Métrica "N/A" |
-| Exceção em provedor | Capturada no hub, log, provedor marcado indisponível após 5 falhas seguidas |
-| Crash com alterações aplicadas | `pending-restore.json` restaurado no próximo início |
-| Hotkey já em uso | Marcada como indisponível na UI |
+| PawnIO driver missing | LHM metrics show "N/A"; banner with a button to install |
+| ADLX/NVAPI missing or unsupported | Limiter disabled with the reason |
+| Failure creating ETW session | FPS "N/A"; reason in the UI; retry every 30 s |
+| PDH counter missing | Metric "N/A" |
+| Exception in provider | Caught in the hub, logged, provider marked unavailable after 5 consecutive failures |
+| Crash with changes applied | `pending-restore.json` restored on next start |
+| Hotkey already in use | Marked as unavailable in the UI |
 
-## 8. Testes
+## 8. Tests
 
-### 8.1 Unitários (xUnit, `Supermonitor.Tests`)
+### 8.1 Unit (xUnit, `Supermonitor.Tests`)
 
-- `RingBuffer<T>`: capacidade, sobrescrita, leitura de janela.
-- `FrameTimeAggregator`: eventos sintéticos de present → FPS e frametime.
-- `BenchmarkStatistics`: média, 1% low, 0,1% low, stutters com dados conhecidos.
-- `GameDetector`: lista do usuário, bibliotecas, exclusões.
-- `SettingsMigrator` e serialização de `AppSettings`.
-- `StandbyCleanerPolicy`: limiares e intervalo mínimo.
-- Formatação de unidades.
+- `RingBuffer<T>`: capacity, overwrite, window read.
+- `FrameTimeAggregator`: synthetic present events → FPS and frametime.
+- `BenchmarkStatistics`: average, 1% low, 0.1% low, stutters with known data.
+- `GameDetector`: user list, libraries, exclusions.
+- `SettingsMigrator` and `AppSettings` serialization.
+- `StandbyCleanerPolicy`: thresholds and minimum interval.
+- Unit formatting.
 
-### 8.2 Fumaça na máquina real
+### 8.2 Real-machine smoke
 
-Teste marcado com trait `Hardware`, fora da execução padrão: inicializa cada provedor e verifica `IsAvailable` e valores dentro de faixas plausíveis.
+Test marked with the `Hardware` trait, outside the default run: initializes each provider and checks `IsAvailable` and values within plausible ranges.
 
-### 8.3 Verificação manual
+### 8.3 Manual verification
 
-1. Comparar CPU, RAM, disco e rede com o Gerenciador de Tarefas.
-2. Medir CPU do próprio app com o dashboard aberto e fechado (critérios 1 e 2).
-3. Abrir um jogo borderless, conferir overlay e FPS.
-4. Aplicar limite de FPS e conferir no overlay.
-5. Rodar um benchmark e conferir CSV e resumo.
-6. Encerrar o app à força com Modo Jogo ativo e conferir a restauração no próximo início.
+1. Compare CPU, RAM, disk and network with Task Manager.
+2. Measure the app's own CPU with the dashboard open and closed (criteria 1 and 2).
+3. Open a borderless game, check overlay and FPS.
+4. Apply an FPS limit and check it in the overlay.
+5. Run a benchmark and check the CSV and summary.
+6. Force-kill the app with Game Mode active and check the restoration on next start.

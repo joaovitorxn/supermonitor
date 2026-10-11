@@ -6,7 +6,7 @@ public static class PawnIoInstaller
 {
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(4);
 
-    // Retorna o código de saída do winget, ou -1 se estourar o tempo (o processo é encerrado).
+    // Returns the winget exit code, or -1 on timeout (the process is killed).
     public static async Task<int> InstallAsync(CancellationToken cancellationToken = default)
     {
         using var process = Process.Start(new ProcessStartInfo(

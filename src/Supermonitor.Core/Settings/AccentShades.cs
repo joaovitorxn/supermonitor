@@ -1,6 +1,6 @@
 namespace Supermonitor.Core.Settings;
 
-// Tons usados pelos recursos SystemAccentColor{Light,Dark}{1..3} do WinUI.
+// Shades used by the WinUI SystemAccentColor{Light,Dark}{1..3} resources.
 public readonly record struct AccentShades(
     (byte R, byte G, byte B) Base,
     (byte R, byte G, byte B) Light1,

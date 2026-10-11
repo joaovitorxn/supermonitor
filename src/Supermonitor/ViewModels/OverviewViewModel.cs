@@ -95,7 +95,7 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
         }
     }
 
-    // ItemsRepeater não reorganiza o layout após ObservableCollection.Move; Remove+Insert força o re-layout.
+    // ItemsRepeater does not re-layout after ObservableCollection.Move; Remove+Insert forces a re-layout.
     private void MoveCard(int from, int to)
     {
         var card = Cards[from];

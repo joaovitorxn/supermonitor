@@ -61,7 +61,7 @@ public sealed partial class OverlayPage : Page
 
     protected override void OnNavigatedFrom(NavigationEventArgs e) => Cleanup();
 
-    // Idempotente: Unloaded pode não disparar quando a janela fecha, então a MainWindow também chama.
+    // Idempotent: Unloaded may not fire when the window closes, so MainWindow also calls it.
     public void Cleanup()
     {
         _statusTimer.Stop();
@@ -83,7 +83,7 @@ public sealed partial class OverlayPage : Page
         UpdateCaptureStatus();
     });
 
-    // Copia as configurações para os controles.
+    // Copies the settings into the controls.
     private void Reload()
     {
         _loading = true;
@@ -113,7 +113,7 @@ public sealed partial class OverlayPage : Page
         RefreshPreview();
     }
 
-    // Grava, aplica no overlay real e atualiza preview e seleção de preset.
+    // Saves, applies to the real overlay and updates the preview and preset selection.
     private void Commit()
     {
         _host!.Settings.RequestSave();
@@ -255,7 +255,7 @@ public sealed partial class OverlayPage : Page
         }
     }
 
-    // ----- posição -----
+    // ----- position -----
 
     private void FillMonitors()
     {
@@ -345,7 +345,7 @@ public sealed partial class OverlayPage : Page
         Commit();
     }
 
-    // ----- métricas -----
+    // ----- metrics -----
 
     private void RebuildItems()
     {
@@ -359,10 +359,10 @@ public sealed partial class OverlayPage : Page
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             }
 
-            row.Children.Add(new TextBlock { Text = OverlayMetricCatalog.Label(item.Metric), VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBlock { Text = item.CustomLabel ?? OverlayMetricCatalog.Label(item.Metric), VerticalAlignment = VerticalAlignment.Center });
             AddRowButton(row, 1, "", "Move up", item.Metric, OnItemUp);
             AddRowButton(row, 2, "", "Move down", item.Metric, OnItemDown);
-            AddRowButton(row, 3, "", "Colors and thresholds", item.Metric, OnItemEdit);
+            AddRowButton(row, 3, "", "Label, colors and thresholds", item.Metric, OnItemEdit);
             AddRowButton(row, 4, "", "Remove", item.Metric, OnItemRemove);
             ItemsPanel.Children.Add(row);
         }
@@ -447,7 +447,7 @@ public sealed partial class OverlayPage : Page
         }
     }
 
-    // ----- texto, cores e fundo -----
+    // ----- text, colors and background -----
 
     private void FillFonts()
     {

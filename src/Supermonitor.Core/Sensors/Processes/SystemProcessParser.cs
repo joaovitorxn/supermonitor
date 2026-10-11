@@ -2,7 +2,7 @@ namespace Supermonitor.Core.Sensors.Processes;
 
 public readonly record struct RawProcessEntry(int ProcessId, long CreateTime, long CpuTime, long PrivateWorkingSet, nint NamePointer, int NameChars);
 
-// Layout x64 de SYSTEM_PROCESS_INFORMATION (0x100 bytes, seguido pelas threads).
+// x64 layout of SYSTEM_PROCESS_INFORMATION (0x100 bytes, followed by the threads).
 public static unsafe class SystemProcessParser
 {
     public const int EntrySize = 0x100;

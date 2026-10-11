@@ -251,4 +251,24 @@ public class OverlaySettingsTests
         Assert.Equal((60f, 30f), (style.Items[1].Threshold!.Warning, style.Items[1].Threshold!.Critical));
         Assert.Equal((80f, 90f), (style.Items[2].Threshold!.Warning, style.Items[2].Threshold!.Critical));
     }
+
+    [Fact]
+    public void Custom_labels_are_trimmed_capped_and_blank_ones_cleared()
+    {
+        var style = new OverlayStyle
+        {
+            Items =
+            [
+                new OverlayItemSettings { Metric = OverlayMetric.Fps, CustomLabel = "  Frames  " },
+                new OverlayItemSettings { Metric = OverlayMetric.Ram, CustomLabel = "   " },
+                new OverlayItemSettings { Metric = OverlayMetric.Ping, CustomLabel = new string('x', 80) },
+            ],
+        };
+
+        style.Normalize();
+
+        Assert.Equal("Frames", style.Items[0].CustomLabel);
+        Assert.Null(style.Items[1].CustomLabel);
+        Assert.Equal(OverlayStyle.MaxLabelLength, style.Items[2].CustomLabel!.Length);
+    }
 }

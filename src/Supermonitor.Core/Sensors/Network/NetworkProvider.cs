@@ -31,7 +31,7 @@ public sealed unsafe class NetworkProvider : ISensorProvider
 
     public void Sample(MetricStore store, TimeSpan elapsed)
     {
-        // Adaptadores que sobem depois do início (Wi-Fi, VPN, USB) entram na próxima varredura.
+        // Adapters that come up after startup (Wi-Fi, VPN, USB) join on the next scan.
         _sinceScan += elapsed;
         if (_sinceScan >= RescanInterval)
         {

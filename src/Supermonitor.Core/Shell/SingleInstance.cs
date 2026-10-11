@@ -36,7 +36,7 @@ public sealed class SingleInstance : IDisposable
     {
         if (EventWaitHandle.TryOpenExisting(names.ActivateEvent, out var handle))
         {
-            // Este processo tem o direito de foco (o usuário acabou de abri-lo); repassa à instância existente.
+            // This process has focus rights (the user just opened it); hands off to the existing instance.
             User32.AllowSetForegroundWindow(User32.ASFW_ANY);
             using (handle)
             {

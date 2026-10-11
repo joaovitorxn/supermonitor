@@ -1,35 +1,35 @@
-# Supermonitor Plano 3 — Captura de FPS e overlay: Implementation Plan
+# Supermonitor Plan 3 — FPS Capture and Overlay: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Capturar FPS e frametime reais do processo em primeiro plano por ETW e exibi-los (junto com CPU, GPU, RAM, rede, ping e relógio) em um overlay click-through desenhado com Direct2D, com editor de aparência, preview ao vivo e presets.
+**Goal:** Capture the real FPS and frametime of the foreground process via ETW and display them (together with CPU, GPU, RAM, network, ping and clock) in a click-through overlay drawn with Direct2D, with an appearance editor, live preview and presets.
 
-**Architecture:** `EtwPresentSource` (TraceEvent) emite um evento por present do provedor `Microsoft-Windows-DxgKrnl`. `FrameCaptureService` liga a sessão só enquanto existe uma lease `Demand.FrameCapture`, escolhe o processo em primeiro plano como alvo e alimenta um `FrameTimeAggregator` (lógica pura). O overlay é uma janela Win32 layered em thread própria (`Supermonitor.Overlay`): `OverlayFrameBuilder` (Core, puro) transforma o estilo e os valores em linhas de texto; `OverlayRenderer` desenha essas linhas com Direct2D num DIB premultiplicado; `UpdateLayeredWindow` apresenta o DIB. O mesmo renderizador gera o preview do editor. Configurações passam para o schema v3 (`Overlay` com estilo, itens, presets do usuário).
+**Architecture:** `EtwPresentSource` (TraceEvent) emits one event per present from the `Microsoft-Windows-DxgKrnl` provider. `FrameCaptureService` turns the session on only while a `Demand.FrameCapture` lease exists, picks the foreground process as the target and feeds a `FrameTimeAggregator` (pure logic). The overlay is a layered Win32 window on its own thread (`Supermonitor.Overlay`): `OverlayFrameBuilder` (Core, pure) turns the style and values into text rows; `OverlayRenderer` draws those rows with Direct2D into a premultiplied DIB; `UpdateLayeredWindow` presents the DIB. The same renderer produces the editor preview. Settings move to schema v3 (`Overlay` with style, items, user presets).
 
-**Tech Stack:** igual aos Planos 1–2 + `Microsoft.Diagnostics.Tracing.TraceEvent` 3.2.8 (Core) e `Vortice.Direct2D1` 3.8.3 (Overlay; traz DirectWrite e DXGI).
+**Tech Stack:** same as Plans 1–2 + `Microsoft.Diagnostics.Tracing.TraceEvent` 3.2.8 (Core) and `Vortice.Direct2D1` 3.8.3 (Overlay; brings DirectWrite and DXGI).
 
-**Spec:** `docs/superpowers/specs/2026-10-10-supermonitor-design.md` (seções 3.4, 3.5, 4.4)
-**Índice:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
-**Base:** `main` em `63c564f` (Plano 2 concluído; resultados em `docs/superpowers/plans/2026-10-10-supermonitor-02-results.md`).
+**Spec:** `docs/superpowers/specs/2026-10-10-supermonitor-design.md` (sections 3.4, 3.5, 4.4)
+**Index:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
+**Base:** `main` at `63c564f` (Plan 2 complete; results in `docs/superpowers/plans/2026-10-10-supermonitor-02-results.md`).
 
 ## Global Constraints
 
-- Tudo dos Planos 1–2 continua valendo: Windows 11, x64, `net10.0-windows10.0.22621.0`, unpackaged, `requireAdministrator`, UI em EN-US, `N/A` para valor ausente, `Supermonitor.Core` sem dependência de WinUI, comentários e identificadores como no código existente (comentários em português, nomes e textos de UI em inglês).
-- Testes de unidade: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`. Testes de hardware: `dotnet test --project tests/Supermonitor.Tests --filter-trait "Category=Hardware"`. Suíte completa: `dotnet test --project tests/Supermonitor.Tests`.
-- Build do app: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64`. Com o app aberto o exe fica bloqueado; para checar compilação use `-o <pasta temporária>`.
-- O app elevado não pode ser encerrado nem clicado por um shell sem elevação, e este shell não é elevado. Verificações visuais e testes que exigem administrador (ETW) ficam com o usuário (sair pela bandeja, aprovar UAC). Testes ETW usam `Assert.Skip` quando o processo não é administrador.
-- Critérios de desempenho continuam: dashboard aberto < 1% CPU, só bandeja **com overlay visível e FPS ligado** < 0,3% CPU (build Release, intervalo 1 s).
-- Fonte do FPS: evento `Present` (id 184, versão 1) do provedor `Microsoft-Windows-DxgKrnl` (GUID `802ec45a-1e99-4b83-9920-87c98277ba9d`), palavra-chave `Present` (`0x8000000`). Medido nesta máquina em 2026-10-10: o `ProcessID` do cabeçalho é o do app que apresenta (ex.: o processo do Claude a ~240 eventos/s), e o provedor inteiro com essa palavra-chave gera ~6000 eventos/s no sistema e custa ~31 ms de CPU em 8 s. O evento `Microsoft-Windows-DXGI` Present_Start (id 42) existe, mas não chegou para o processo testado (Chromium usa DirectComposition); por isso o plano usa só o DxgKrnl e **não** usa o DXGI (desvio da spec 3.4, registrado nos resultados). Se um jogo DX11/DX12 não mostrar FPS na verificação manual da Task 10, o DXGI vira o fallback.
-- Vortice 3.8.3, API conferida por spike em 2026-10-10: `D2D1.D2D1CreateFactory<ID2D1Factory1>()`, `DWrite.DWriteCreateFactory<IDWriteFactory>()`, `factory.CreateDCRenderTarget(new RenderTargetProperties(RenderTargetType.Default, new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied), 0, 0, RenderTargetUsage.GdiCompatible, FeatureLevel.Default))`, `target.BindDC(hdc, new RectI(0, 0, w, h))`, `new RoundedRectangle(new System.Drawing.RectangleF(...), rx, ry)`, `dwrite.CreateTextFormat(family, FontWeight.SemiBold, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size)`, `dwrite.CreateTextLayout(text, format, maxWidth, maxHeight)`, `target.DrawTextLayout(Vector2, layout, brush)`. `AlphaMode` precisa do alias `using AlphaMode = Vortice.DCommon.AlphaMode;`. O resultado num DIB top-down tem canto transparente (alpha 0) e fundo a 60% com alpha 153, ou seja, premultiplicado correto para `UpdateLayeredWindow`.
-- Todo commit termina com `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Everything from Plans 1–2 still applies: Windows 11, x64, `net10.0-windows10.0.22621.0`, unpackaged, `requireAdministrator`, UI in EN-US, `N/A` for a missing value, `Supermonitor.Core` with no WinUI dependency, comments and identifiers as in the existing code (comments, names and UI text in English).
+- Unit tests: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`. Hardware tests: `dotnet test --project tests/Supermonitor.Tests --filter-trait "Category=Hardware"`. Full suite: `dotnet test --project tests/Supermonitor.Tests`.
+- App build: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64`. With the app open the exe is locked; to check compilation use `-o <temporary folder>`.
+- The elevated app cannot be closed or clicked by a non-elevated shell, and this shell is not elevated. Visual checks and tests that require administrator (ETW) are left to the user (exit through the tray, approve UAC). ETW tests use `Assert.Skip` when the process is not administrator.
+- Performance criteria remain: dashboard open < 1% CPU, tray only **with overlay visible and FPS on** < 0.3% CPU (Release build, 1 s interval).
+- FPS source: `Present` event (id 184, version 1) of the `Microsoft-Windows-DxgKrnl` provider (GUID `802ec45a-1e99-4b83-9920-87c98277ba9d`), `Present` keyword (`0x8000000`). Measured on this machine on 2026-10-10: the header `ProcessID` is that of the presenting app (e.g. the Claude process at ~240 events/s), and the whole provider with that keyword generates ~6000 events/s on the system and costs ~31 ms of CPU in 8 s. The `Microsoft-Windows-DXGI` Present_Start event (id 42) exists, but did not arrive for the tested process (Chromium uses DirectComposition); so the plan uses only DxgKrnl and does **not** use DXGI (deviation from spec 3.4, recorded in the results). If a DX11/DX12 game does not show FPS in the manual check of Task 10, DXGI becomes the fallback.
+- Vortice 3.8.3, API verified by spike on 2026-10-10: `D2D1.D2D1CreateFactory<ID2D1Factory1>()`, `DWrite.DWriteCreateFactory<IDWriteFactory>()`, `factory.CreateDCRenderTarget(new RenderTargetProperties(RenderTargetType.Default, new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied), 0, 0, RenderTargetUsage.GdiCompatible, FeatureLevel.Default))`, `target.BindDC(hdc, new RectI(0, 0, w, h))`, `new RoundedRectangle(new System.Drawing.RectangleF(...), rx, ry)`, `dwrite.CreateTextFormat(family, FontWeight.SemiBold, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, size)`, `dwrite.CreateTextLayout(text, format, maxWidth, maxHeight)`, `target.DrawTextLayout(Vector2, layout, brush)`. `AlphaMode` needs the alias `using AlphaMode = Vortice.DCommon.AlphaMode;`. The result in a top-down DIB has a transparent corner (alpha 0) and a 60% background with alpha 153, i.e. correctly premultiplied for `UpdateLayeredWindow`.
+- Every commit ends with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
 
-1. Alvo some ou troca (alt-tab, jogo fecha, janela do próprio Supermonitor em primeiro plano) → overlay mostra `N/A` em vez de congelar no último FPS, e a agregação reinicia sem misturar jogos. Testes: Task 4 (`FrameCaptureService`: troca de alvo reinicia, alvo = processo próprio vira nenhum, ocioso > 2 s vira `N/A`).
-2. Sessão ETW falha (sem administrador, sessão órfã de um crash) → FPS `N/A` com motivo, nova tentativa a cada 30 s, app sem exceção. Testes: Task 4 (falha, retry com `FakeTimeProvider`) e Task 5 (hardware: sessão órfã é substituída).
-3. Pausa longa entre presents (loading, jogo minimizado, alt-tab) → um frametime de minutos não pode virar 1% low de 0 FPS. Teste: Task 1 (`MaxGapMs` reinicia a sequência).
-4. Configurações v2 do Plano 2 e arquivo com valores inválidos de overlay (fonte vazia, opacidade 7, enum desconhecido, cor "blue", itens duplicados) → carrega normalizado, sem perder o resto. Testes: Task 2.
-5. Overlay em monitor que sumiu, DPI diferente ou posição fora da tela → janela sempre dentro do monitor escolhido (volta ao primário se o monitor não existe). Testes: Task 3 (`OverlayPlacement` limita à tela) e Task 6 (resolução de monitor).
+1. Target disappears or changes (alt-tab, game closes, Supermonitor's own window in the foreground) → overlay shows `N/A` instead of freezing on the last FPS, and aggregation restarts without mixing games. Tests: Task 4 (`FrameCaptureService`: target change restarts, target = own process becomes none, idle > 2 s becomes `N/A`).
+2. ETW session fails (no administrator, orphan session from a crash) → FPS `N/A` with a reason, retry every 30 s, app without exception. Tests: Task 4 (failure, retry with `FakeTimeProvider`) and Task 5 (hardware: orphan session is replaced).
+3. Long pause between presents (loading, minimized game, alt-tab) → a frametime of minutes must not become a 1% low of 0 FPS. Test: Task 1 (`MaxGapMs` restarts the sequence).
+4. Plan 2 v2 settings and a file with invalid overlay values (empty font, opacity 7, unknown enum, color "blue", duplicate items) → loads normalized, without losing the rest. Tests: Task 2.
+5. Overlay on a monitor that disappeared, different DPI or position outside the screen → window always inside the chosen monitor (falls back to the primary if the monitor does not exist). Tests: Task 3 (`OverlayPlacement` clamps to the screen) and Task 6 (monitor resolution).
 
 ---
 
@@ -39,47 +39,47 @@
 src/Supermonitor.Core/
   Supermonitor.Core.csproj                  + Microsoft.Diagnostics.Tracing.TraceEvent
   AppHost.cs                                + Frames (FrameCaptureService)
-  Frames/Percentile.cs                      percentil nearest-rank (reaproveitado pelo benchmark do Plano 4)
+  Frames/Percentile.cs                      nearest-rank percentile (reused by Plan 4's benchmark)
   Frames/FrameTimeAggregator.cs             FrameStats, FrameTimeAggregator
   Frames/FrameCaptureService.cs             IPresentSource, IForegroundProbe, FrameCaptureService
-  Frames/EtwPresentSource.cs                sessão ETW Supermonitor-FPS
+  Frames/EtwPresentSource.cs                ETW session Supermonitor-FPS
   Frames/ForegroundProbe.cs                 GetForegroundWindow → PID
   Interop/User32.cs                         + GetForegroundWindow, GetWindowThreadProcessId
   Overlay/OverlaySettings.cs                enums, OverlayItemSettings, OverlayStyle, OverlayPreset, OverlaySettings
   Overlay/OverlayPresets.cs                 Minimal, Default, Full
-  Overlay/OverlayEditor.cs                  itens, presets do usuário
+  Overlay/OverlayEditor.cs                  items, user presets
   Overlay/Rgba.cs
-  Overlay/OverlayMetricCatalog.cs           rótulo, unidade, id na MetricStore, demanda
+  Overlay/OverlayMetricCatalog.cs           label, unit, MetricStore id, demand
   Overlay/IOverlayValues.cs                 IOverlayValues, DemoOverlayValues
   Overlay/OverlayFrame.cs                   OverlayRow, OverlayFrame
-  Overlay/OverlayFrameBuilder.cs            estilo + valores → linhas
-  Overlay/OverlayPlacement.cs               PixelRect, âncoras
-  Overlay/OverlayRefresh.cs                 taxa efetiva
+  Overlay/OverlayFrameBuilder.cs            style + values → rows
+  Overlay/OverlayPlacement.cs               PixelRect, anchors
+  Overlay/OverlayRefresh.cs                 effective rate
   Sensors/DemandTracker.cs                  + Demand.FrameCapture
   Settings/AppSettings.cs                   + Overlay
   Settings/SettingsMigrator.cs              v2 → v3
   Settings/SettingsJsonContext.cs           + OverlayStyle
-  Shell/TrayIcon.cs                         + item "Show overlay"
+  Shell/TrayIcon.cs                         + "Show overlay" item
 src/Supermonitor.Overlay/
   Supermonitor.Overlay.csproj               Vortice.Direct2D1
   Interop/Gdi32.cs, Interop/User32.cs, Interop/Shcore.cs
   OverlayRenderer.cs                        Direct2D → DIB
-  OverlayWindow.cs                          janela layered + thread + timer
-  OverlayService.cs                         leases, valores ao vivo, monitores
-  LiveOverlayValues.cs                      IOverlayValues sobre MetricStore + FrameCaptureService
-  MonitorCatalog.cs                         MonitorInfo, enumeração, DPI
+  OverlayWindow.cs                          layered window + thread + timer
+  OverlayService.cs                         leases, live values, monitors
+  LiveOverlayValues.cs                      IOverlayValues over MetricStore + FrameCaptureService
+  MonitorCatalog.cs                         MonitorInfo, enumeration, DPI
 src/Supermonitor/
   Supermonitor.csproj                       + ProjectReference Overlay
-  App.xaml.cs                               OverlayService, item de bandeja
-  MainWindow.xaml(.cs)                      item de navegação Overlay
+  App.xaml.cs                               OverlayService, tray item
+  MainWindow.xaml(.cs)                      Overlay navigation item
   Views/OverlayPage.xaml(.cs)               editor + preview
-  Dialogs/OverlayItemDialog.cs              cores e limiares por item
-tests/Supermonitor.Tests/                   um arquivo por unidade, listado em cada task; referencia Supermonitor.Overlay
+  Dialogs/OverlayItemDialog.cs              colors and thresholds per item
+tests/Supermonitor.Tests/                   one file per unit, listed in each task; references Supermonitor.Overlay
 ```
 
 ---
 
-### Task 1: FrameTimeAggregator e percentil
+### Task 1: FrameTimeAggregator and percentile
 
 **Files:**
 - Create: `src/Supermonitor.Core/Frames/Percentile.cs`, `src/Supermonitor.Core/Frames/FrameTimeAggregator.cs`
@@ -88,11 +88,11 @@ tests/Supermonitor.Tests/                   um arquivo por unidade, listado em c
 **Interfaces:**
 - Consumes: `Supermonitor.Core.Collections.RingBuffer<T>`.
 - Produces:
-  - `static class Percentile { static float NearestRank(Span<float> values, double percent) }` — ordena `values` no lugar; `NaN` se vazio.
-  - `readonly record struct FrameStats(bool HasData, double Fps, double FrameTimeMs, double Low1PercentFps, long FrameCount)` com `static FrameStats None`.
-  - `sealed class FrameTimeAggregator` com `const double FpsWindowMs = 1000`, `LowWindowMs = 10_000`, `MaxGapMs = 5000`, `const int Capacity = 16384`; `void AddPresent(double timestampMs)`, `FrameStats GetStats()`, `int CopyFrameTimes(Span<float> destination)`, `long Version { get; }`, `void Reset()`.
+  - `static class Percentile { static float NearestRank(Span<float> values, double percent) }` — sorts `values` in place; `NaN` if empty.
+  - `readonly record struct FrameStats(bool HasData, double Fps, double FrameTimeMs, double Low1PercentFps, long FrameCount)` with `static FrameStats None`.
+  - `sealed class FrameTimeAggregator` with `const double FpsWindowMs = 1000`, `LowWindowMs = 10_000`, `MaxGapMs = 5000`, `const int Capacity = 16384`; `void AddPresent(double timestampMs)`, `FrameStats GetStats()`, `int CopyFrameTimes(Span<float> destination)`, `long Version { get; }`, `void Reset()`.
 
-- [ ] **Step 1: Escrever os testes do percentil**
+- [ ] **Step 1: Write the percentile tests**
 
 `tests/Supermonitor.Tests/Frames/PercentileTests.cs`:
 
@@ -120,7 +120,7 @@ public class PercentileTests
     [Fact]
     public void Ninety_nine_point_nine_of_one_to_thousand_is_nine_ninety_nine()
     {
-        // 99,9 * 1000 / 100 em ponto flutuante passa de 999 por erro de arredondamento; o resultado correto é o posto 999.
+        // 99.9 * 1000 / 100 in floating point exceeds 999 due to rounding error; the correct result is rank 999.
         Assert.Equal(999f, Percentile.NearestRank(Range(1000), 99.9));
     }
 
@@ -150,12 +150,12 @@ public class PercentileTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Frames.PercentileTests"`
-Expected: erro de compilação (`Percentile` não existe).
+Expected: compile error (`Percentile` does not exist).
 
-- [ ] **Step 3: Implementar `Percentile`**
+- [ ] **Step 3: Implement `Percentile`**
 
 `src/Supermonitor.Core/Frames/Percentile.cs`:
 
@@ -164,7 +164,7 @@ namespace Supermonitor.Core.Frames;
 
 public static class Percentile
 {
-    // Nearest-rank: o menor valor com pelo menos `percent`% dos dados menores ou iguais a ele. Ordena `values` no lugar.
+    // Nearest-rank: the smallest value with at least `percent`% of the data less than or equal to it. Sorts `values` in place.
     public static float NearestRank(Span<float> values, double percent)
     {
         if (values.IsEmpty)
@@ -173,19 +173,19 @@ public static class Percentile
         }
 
         values.Sort();
-        // O epsilon evita que 99,9 * 1000 / 100 = 999,0000000000001 vire o posto 1000.
+        // The epsilon prevents 99.9 * 1000 / 100 = 999.0000000000001 from becoming rank 1000.
         var rank = (int)Math.Ceiling(percent * values.Length / 100d - 1e-9);
         return values[Math.Clamp(rank, 1, values.Length) - 1];
     }
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Frames.PercentileTests"`
-Expected: 7 passam.
+Expected: 7 pass.
 
-- [ ] **Step 5: Escrever os testes do agregador**
+- [ ] **Step 5: Write the aggregator tests**
 
 `tests/Supermonitor.Tests/Frames/FrameTimeAggregatorTests.cs`:
 
@@ -196,7 +196,7 @@ namespace Supermonitor.Tests.Frames;
 
 public class FrameTimeAggregatorTests
 {
-    // Primeiro present não gera frametime (não há anterior); cada intervalo vira um frametime.
+    // The first present produces no frametime (there is no previous one); each interval becomes a frametime.
     private static FrameTimeAggregator Feed(params double[] frameTimesMs)
     {
         var aggregator = new FrameTimeAggregator();
@@ -245,7 +245,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void One_percent_low_comes_from_the_ninety_ninth_percentile_frame_time()
     {
-        // 100 frames: 96 de 10 ms e 4 de 40 ms → posto 99 = 40 ms → 25 FPS.
+        // 100 frames: 96 of 10 ms and 4 of 40 ms → rank 99 = 40 ms → 25 FPS.
         var frameTimes = Enumerable.Repeat(10.0, 100).ToArray();
         frameTimes[20] = frameTimes[40] = frameTimes[60] = frameTimes[80] = 40;
 
@@ -258,7 +258,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void Fps_uses_only_the_last_second()
     {
-        // 5 s a 50 FPS (20 ms) seguidos de 1,5 s a 100 FPS (10 ms).
+        // 5 s at 50 FPS (20 ms) followed by 1.5 s at 100 FPS (10 ms).
         var frameTimes = Enumerable.Repeat(20.0, 250).Concat(Enumerable.Repeat(10.0, 150)).ToArray();
 
         var stats = Feed(frameTimes).GetStats();
@@ -286,7 +286,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void A_short_pause_is_kept_as_a_frame_time()
     {
-        // 4 frames: o posto 99 é o maior (800 ms) → 1,25 FPS de 1% low; o frametime atual segue sendo o último.
+        // 4 frames: rank 99 is the largest (800 ms) → 1.25 FPS 1% low; the current frametime remains the last one.
         var stats = Feed(10, 10, 800, 10).GetStats();
 
         Assert.Equal(1000.0 / 800, stats.Low1PercentFps, 1e-6);
@@ -347,12 +347,12 @@ public class FrameTimeAggregatorTests
 }
 ```
 
-- [ ] **Step 6: Rodar e ver falhar**
+- [ ] **Step 6: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Frames.FrameTimeAggregatorTests"`
-Expected: erro de compilação (`FrameTimeAggregator` não existe).
+Expected: compile error (`FrameTimeAggregator` does not exist).
 
-- [ ] **Step 7: Implementar o agregador**
+- [ ] **Step 7: Implement the aggregator**
 
 `src/Supermonitor.Core/Frames/FrameTimeAggregator.cs`:
 
@@ -366,8 +366,8 @@ public readonly record struct FrameStats(bool HasData, double Fps, double FrameT
     public static FrameStats None { get; } = new(false, double.NaN, double.NaN, double.NaN, 0);
 }
 
-// Recebe os instantes (ms) dos presents do processo alvo e calcula FPS, frametime e 1% low.
-// Escrito pela thread do ETW e lido pelas threads do overlay e do dashboard; tudo sob um lock curto.
+// Receives the instants (ms) of the target process's presents and computes FPS, frametime and 1% low.
+// Written by the ETW thread and read by the overlay and dashboard threads; everything under a short lock.
 public sealed class FrameTimeAggregator
 {
     public const int Capacity = 16384;
@@ -403,7 +403,7 @@ public sealed class FrameTimeAggregator
 
             if (delta > MaxGapMs)
             {
-                // Pausa longa (loading, alt-tab, jogo minimizado): recomeça a sequência sem registrar o intervalo.
+                // Long pause (loading, alt-tab, minimized game): restarts the sequence without recording the interval.
                 _timestamps.Clear();
                 _frameTimes.Clear();
                 _last = timestampMs;
@@ -479,10 +479,10 @@ public sealed class FrameTimeAggregator
 }
 ```
 
-- [ ] **Step 8: Rodar e ver passar**
+- [ ] **Step 8: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam (os anteriores + 18 novos).
+Expected: all pass (the previous ones + 18 new).
 
 - [ ] **Step 9: Commit**
 
@@ -493,7 +493,7 @@ git commit -m "feat(core): frame time aggregator with FPS, frame time and 1% low
 
 ---
 
-### Task 2: Configurações do overlay (schema v3), presets e editor
+### Task 2: Overlay settings (schema v3), presets and editor
 
 **Files:**
 - Create: `src/Supermonitor.Core/Overlay/OverlaySettings.cs`, `src/Supermonitor.Core/Overlay/OverlayPresets.cs`, `src/Supermonitor.Core/Overlay/OverlayEditor.cs`
@@ -507,14 +507,14 @@ git commit -m "feat(core): frame time aggregator with FPS, frame time and 1% low
   - `enum OverlayLayout { Horizontal, Vertical, Compact }`
   - `enum OverlayMetric { Fps, FrameTime, Low1Percent, CpuUsage, CpuTemperature, CpuClock, CpuPower, GpuUsage, GpuTemperature, GpuClock, GpuPower, GpuVram, Ram, NetworkDown, NetworkUp, Ping, Clock }`
   - `class OverlayItemSettings { OverlayMetric Metric; string? LabelColor; string? ValueColor; MetricThreshold? Threshold; OverlayItemSettings Clone(); }`
-  - `class OverlayStyle` com `OverlayAnchor Anchor`, `int OffsetX`, `int OffsetY`, `OverlayLayout Layout`, `string FontFamily`, `float FontSize`, `string LabelColor`, `string ValueColor`, `string BackgroundColor`, `float BackgroundOpacity`, `int CornerRadius`, `int Padding`, `bool ShowFrameGraph`, `int GraphWidth`, `int GraphHeight`, `int RefreshHz`, `List<OverlayItemSettings> Items`; `static IReadOnlyList<int> AllowedRefreshHz`; `OverlayStyle Clone()`; `void Normalize()`.
+  - `class OverlayStyle` with `OverlayAnchor Anchor`, `int OffsetX`, `int OffsetY`, `OverlayLayout Layout`, `string FontFamily`, `float FontSize`, `string LabelColor`, `string ValueColor`, `string BackgroundColor`, `float BackgroundOpacity`, `int CornerRadius`, `int Padding`, `bool ShowFrameGraph`, `int GraphWidth`, `int GraphHeight`, `int RefreshHz`, `List<OverlayItemSettings> Items`; `static IReadOnlyList<int> AllowedRefreshHz`; `OverlayStyle Clone()`; `void Normalize()`.
   - `class OverlayPreset { string Name; OverlayStyle Style; }`
   - `class OverlaySettings { bool Enabled; string? MonitorId; OverlayStyle Style; List<OverlayPreset> UserPresets; void Normalize(); }`
   - `static class OverlayPresets { const string MinimalName, DefaultName, FullName; OverlayStyle Minimal(); OverlayStyle Default(); OverlayStyle Full(); IReadOnlyList<OverlayPreset> BuiltIn(); }`
   - `static class OverlayEditor { bool AddItem(OverlayStyle, OverlayMetric); bool RemoveItem(OverlayStyle, OverlayMetric); int MoveItem(OverlayStyle, OverlayMetric, int delta); void ApplyPreset(OverlaySettings, OverlayPreset); bool SavePreset(OverlaySettings, string name); bool DeletePreset(OverlaySettings, string name); IReadOnlyList<OverlayPreset> AllPresets(OverlaySettings); string? MatchingPresetName(OverlaySettings); }`
   - `AppSettings.Overlay` (`OverlaySettings`), `SettingsMigrator.CurrentVersion == 3`.
 
-- [ ] **Step 1: Escrever os testes das configurações**
+- [ ] **Step 1: Write the settings tests**
 
 `tests/Supermonitor.Tests/Overlay/OverlaySettingsTests.cs`:
 
@@ -716,7 +716,7 @@ public class OverlaySettingsTests
 }
 ```
 
-`tests/Supermonitor.Tests/Settings/SettingsMigratorTests.cs` — acrescentar dentro da classe:
+`tests/Supermonitor.Tests/Settings/SettingsMigratorTests.cs` — add inside the class:
 
 ```csharp
     [Fact]
@@ -756,9 +756,9 @@ public class OverlaySettingsTests
     }
 ```
 
-E em `tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` troque `Assert.Equal(2, settings.Version);` por `Assert.Equal(3, settings.Version);`.
+And in `tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` replace `Assert.Equal(2, settings.Version);` with `Assert.Equal(3, settings.Version);`.
 
-- [ ] **Step 2: Escrever os testes do editor**
+- [ ] **Step 2: Write the editor tests**
 
 `tests/Supermonitor.Tests/Overlay/OverlayEditorTests.cs`:
 
@@ -884,12 +884,12 @@ public class OverlayEditorTests
 }
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [ ] **Step 3: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (tipos do overlay não existem).
+Expected: compile error (overlay types do not exist).
 
-- [ ] **Step 4: Implementar as configurações**
+- [ ] **Step 4: Implement the settings**
 
 `src/Supermonitor.Core/Overlay/OverlaySettings.cs`:
 
@@ -1122,7 +1122,7 @@ public static class OverlayPresets
 
     public static IReadOnlyList<string> BuiltInNames { get; } = [MinimalName, DefaultName, FullName];
 
-    // Só FPS, numa linha.
+    // FPS only, on one line.
     public static OverlayStyle Minimal() => new()
     {
         Layout = OverlayLayout.Compact,
@@ -1219,7 +1219,7 @@ public static class OverlayEditor
     public static IReadOnlyList<OverlayPreset> AllPresets(OverlaySettings overlay) =>
         [.. OverlayPresets.BuiltIn(), .. overlay.UserPresets];
 
-    // Nome do preset cujo estilo é idêntico ao atual, ou null quando o usuário mexeu em algo.
+    // Name of the preset whose style is identical to the current one, or null when the user changed something.
     public static string? MatchingPresetName(OverlaySettings overlay)
     {
         var current = Serialize(overlay.Style);
@@ -1231,34 +1231,34 @@ public static class OverlayEditor
 }
 ```
 
-`SettingsJsonContext` precisa expor `OverlayStyle`. Em `src/Supermonitor.Core/Settings/SettingsJsonContext.cs` acrescente o atributo (e `using Supermonitor.Core.Overlay;`):
+`SettingsJsonContext` needs to expose `OverlayStyle`. In `src/Supermonitor.Core/Settings/SettingsJsonContext.cs` add the attribute (and `using Supermonitor.Core.Overlay;`):
 
 ```csharp
 [JsonSerializable(typeof(AppSettings))]
 [JsonSerializable(typeof(OverlayStyle))]
 ```
 
-Em `AppSettings.cs` (adicione `using Supermonitor.Core.Overlay;`): propriedade `public OverlaySettings Overlay { get; set; } = new();` depois de `Thresholds`, e no fim de `Normalize()`:
+In `AppSettings.cs` (add `using Supermonitor.Core.Overlay;`): property `public OverlaySettings Overlay { get; set; } = new();` after `Thresholds`, and at the end of `Normalize()`:
 
 ```csharp
         Overlay ??= new OverlaySettings();
         Overlay.Normalize();
 ```
 
-Em `SettingsMigrator.cs`: `public const int CurrentVersion = 3;` e, antes de `root["version"] = version;`:
+In `SettingsMigrator.cs`: `public const int CurrentVersion = 3;` and, before `root["version"] = version;`:
 
 ```csharp
-        // v2 → v3: o bloco "overlay" é novo; ausente, o AppSettings usa os padrões. Nenhum campo mudou.
+        // v2 → v3: the "overlay" block is new; when absent, AppSettings uses the defaults. No field changed.
         if (version < 3)
         {
             version = 3;
         }
 ```
 
-- [ ] **Step 5: Rodar e ver passar**
+- [ ] **Step 5: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1269,27 +1269,27 @@ git commit -m "feat(core): overlay settings, presets and editor (settings schema
 
 ---
 
-### Task 3: Conteúdo do overlay (catálogo, linhas, posição, taxa)
+### Task 3: Overlay content (catalog, rows, placement, rate)
 
 **Files:**
-- Create: `src/Supermonitor.Core/Overlay/Rgba.cs`, `OverlayMetricCatalog.cs`, `IOverlayValues.cs`, `OverlayFrame.cs`, `OverlayFrameBuilder.cs`, `OverlayPlacement.cs`, `OverlayRefresh.cs` (todos em `src/Supermonitor.Core/Overlay/`)
+- Create: `src/Supermonitor.Core/Overlay/Rgba.cs`, `OverlayMetricCatalog.cs`, `IOverlayValues.cs`, `OverlayFrame.cs`, `OverlayFrameBuilder.cs`, `OverlayPlacement.cs`, `OverlayRefresh.cs` (all in `src/Supermonitor.Core/Overlay/`)
 - Modify: `src/Supermonitor.Core/Sensors/DemandTracker.cs`
 - Test: `tests/Supermonitor.Tests/Overlay/OverlayFrameBuilderTests.cs`, `OverlayPlacementTests.cs`, `OverlayCatalogTests.cs`
 
 **Interfaces:**
 - Consumes: `OverlayStyle`, `OverlayMetric`, `MetricThreshold`, `UnitFormatter`, `UnitOptions`, `MetricIds`, `MetricUnit`, `ThresholdEvaluator`, `ColorText`.
 - Produces:
-  - `Demand.FrameCapture` (novo membro de `Demand`).
-  - `readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)` com `static bool TryParse(string? hex, out Rgba color)` e `static Rgba Parse(string hex, Rgba fallback)`.
-  - `static class OverlayMetricCatalog { string Label(OverlayMetric); MetricUnit Unit(OverlayMetric); string? StoreMetricId(OverlayMetric); Demand? Demand(OverlayMetric); }` (ids da MetricStore usam a GPU 0).
+  - `Demand.FrameCapture` (new member of `Demand`).
+  - `readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)` with `static bool TryParse(string? hex, out Rgba color)` and `static Rgba Parse(string hex, Rgba fallback)`.
+  - `static class OverlayMetricCatalog { string Label(OverlayMetric); MetricUnit Unit(OverlayMetric); string? StoreMetricId(OverlayMetric); Demand? Demand(OverlayMetric); }` (MetricStore ids use GPU 0).
   - `static class OverlayDemand { (bool Hardware, bool Frames) For(OverlayStyle style); }`
   - `interface IOverlayValues { double Get(OverlayMetric metric); DateTime Now { get; } long FrameVersion { get; } int CopyFrameTimes(Span<float> destination); }`; `sealed class DemoOverlayValues : IOverlayValues`.
   - `sealed record OverlayRow(string Label, string Value, Rgba LabelColor, Rgba ValueColor)`; `sealed class OverlayFrame { OverlayRow[] Rows; float[] Graph; long GraphVersion; bool SameContentAs(OverlayFrame? other); }`
   - `static class OverlayFrameBuilder { OverlayFrame Build(OverlayStyle style, IOverlayValues values, UnitOptions units, IReadOnlyDictionary<string, MetricThreshold> thresholds); string FormatValue(OverlayMetric metric, double value, DateTime now, UnitOptions units); }`
-  - `readonly record struct PixelRect(int X, int Y, int Width, int Height)` com `Right`/`Bottom`; `static class OverlayPlacement { (int X, int Y) Compute(OverlayAnchor anchor, int offsetX, int offsetY, PixelRect monitor, int width, int height); }`
+  - `readonly record struct PixelRect(int X, int Y, int Width, int Height)` with `Right`/`Bottom`; `static class OverlayPlacement { (int X, int Y) Compute(OverlayAnchor anchor, int offsetX, int offsetY, PixelRect monitor, int width, int height); }`
   - `static class OverlayRefresh { int EffectiveHz(OverlayStyle style); }`
 
-- [ ] **Step 1: Escrever os testes**
+- [ ] **Step 1: Write the tests**
 
 `tests/Supermonitor.Tests/Overlay/OverlayCatalogTests.cs`:
 
@@ -1381,7 +1381,7 @@ public class OverlayPlacementTests
     [InlineData(OverlayAnchor.BottomRight, 1810, 1020)]
     public void Anchors_place_the_overlay_with_the_offset_as_an_inner_margin(OverlayAnchor anchor, int x, int y)
     {
-        // Overlay 200x100, offset 10 px. Em âncoras da direita e de baixo o offset afasta da borda; no centro, desloca para direita/baixo.
+        // Overlay 200x100, offset 10 px. For right and bottom anchors the offset moves away from the edge; at the center, it shifts right/down.
         var position = OverlayPlacement.Compute(anchor, 10, 10, Monitor, 200, 100);
 
         Assert.Equal((x, y), position);
@@ -1626,14 +1626,14 @@ public class OverlayFrameBuilderTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (tipos novos não existem).
+Expected: compile error (new types do not exist).
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
-`Demand` (`src/Supermonitor.Core/Sensors/DemandTracker.cs`): acrescente o membro
+`Demand` (`src/Supermonitor.Core/Sensors/DemandTracker.cs`): add the member
 
 ```csharp
 public enum Demand
@@ -1714,7 +1714,7 @@ public static class OverlayMetricCatalog
         _ => MetricUnit.Count,
     };
 
-    // Id da MetricStore; null para FPS/frametime/1% low (vêm do FrameCaptureService) e para o relógio.
+    // MetricStore id; null for FPS/frametime/1% low (they come from FrameCaptureService) and for the clock.
     public static string? StoreMetricId(OverlayMetric metric) => metric switch
     {
         OverlayMetric.CpuUsage => MetricIds.CpuUsage,
@@ -1753,12 +1753,12 @@ public static class OverlayDemand
 
 public static class OverlayRefresh
 {
-    // O mini-gráfico de frametime redesenha a até 30 Hz; sem ele vale a taxa configurada.
+    // The frametime mini-chart redraws at up to 30 Hz; without it the configured rate applies.
     public static int EffectiveHz(OverlayStyle style) => style.ShowFrameGraph ? 30 : style.RefreshHz;
 }
 ```
 
-Em `OverlayMetricCatalog` o método se chama `Demand`, como o enum; por isso o corpo usa `Sensors.Demand.FrameCapture` (o nome `Sensors` resolve para o namespace `Supermonitor.Core.Sensors`). Em `OverlayDemand` (outra classe) `Demand.HardwareSensors` resolve para o enum.
+In `OverlayMetricCatalog` the method is called `Demand`, like the enum; so the body uses `Sensors.Demand.FrameCapture` (the name `Sensors` resolves to the namespace `Supermonitor.Core.Sensors`). In `OverlayDemand` (another class) `Demand.HardwareSensors` resolves to the enum.
 
 `src/Supermonitor.Core/Overlay/IOverlayValues.cs`:
 
@@ -1769,16 +1769,16 @@ public interface IOverlayValues
 {
     DateTime Now { get; }
 
-    // Muda a cada frame novo; o overlay usa para redesenhar o mini-gráfico.
+    // Changes with every new frame; the overlay uses it to redraw the mini-chart.
     long FrameVersion { get; }
 
-    // Valor na unidade base da métrica; NaN quando indisponível.
+    // Value in the metric's base unit; NaN when unavailable.
     double Get(OverlayMetric metric);
 
     int CopyFrameTimes(Span<float> destination);
 }
 
-// Valores fixos e plausíveis para o preview do editor.
+// Fixed, plausible values for the editor preview.
 public sealed class DemoOverlayValues : IOverlayValues
 {
     private const int FrameCount = 300;
@@ -1840,12 +1840,12 @@ public sealed class OverlayFrame
 
     public OverlayRow[] Rows { get; }
 
-    // Frametimes (ms), do mais antigo ao mais novo; vazio quando o mini-gráfico está desligado.
+    // Frametimes (ms), from oldest to newest; empty when the mini-chart is off.
     public float[] Graph { get; }
 
     public long GraphVersion { get; }
 
-    // Decide se vale redesenhar: texto igual e gráfico sem frame novo → não.
+    // Decides whether redrawing is worthwhile: same text and no new frame in the chart → no.
     public bool SameContentAs(OverlayFrame? other) =>
         other is not null
         && Rows.AsSpan().SequenceEqual(other.Rows)
@@ -1854,7 +1854,7 @@ public sealed class OverlayFrame
 }
 ```
 
-`SequenceEqual` sobre `ReadOnlySpan<OverlayRow>` usa `Equals` do record (igualdade por valor). Se não compilar, use `Enumerable.SequenceEqual(Rows, other.Rows)`.
+`SequenceEqual` over `ReadOnlySpan<OverlayRow>` uses the record's `Equals` (value equality). If it does not compile, use `Enumerable.SequenceEqual(Rows, other.Rows)`.
 
 `src/Supermonitor.Core/Overlay/OverlayFrameBuilder.cs`:
 
@@ -1910,7 +1910,7 @@ public static class OverlayFrameBuilder
         long version = 0;
         if (style.ShowFrameGraph)
         {
-            // Duas amostras por pixel de largura do gráfico.
+            // Two samples per pixel of chart width.
             var buffer = new float[Math.Max(1, style.GraphWidth / 2)];
             var copied = values.CopyFrameTimes(buffer);
             graph = copied == buffer.Length ? buffer : buffer.AsSpan(0, copied).ToArray();
@@ -1932,7 +1932,7 @@ public static class OverlayFrameBuilder
             return "N/A";
         }
 
-        // O rótulo já diz "FPS"; o valor mostra só o número.
+        // The label already says "FPS"; the value shows only the number.
         if (metric is OverlayMetric.Fps or OverlayMetric.Low1Percent)
         {
             return value.ToString("0", Culture);
@@ -1957,8 +1957,8 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
 
 public static class OverlayPlacement
 {
-    // O offset é uma margem para dentro a partir da borda da âncora; no centro desloca para direita/baixo.
-    // O resultado sempre cabe no monitor (ou cola no canto superior esquerdo se o overlay for maior).
+    // The offset is an inward margin from the anchor's edge; at the center it shifts right/down.
+    // The result always fits in the monitor (or sticks to the top-left corner if the overlay is larger).
     public static (int X, int Y) Compute(OverlayAnchor anchor, int offsetX, int offsetY, PixelRect monitor, int width, int height)
     {
         var column = (int)anchor % 3;
@@ -1984,10 +1984,10 @@ public static class OverlayPlacement
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1998,7 +1998,7 @@ git commit -m "feat(core): overlay content builder, metric catalog, placement an
 
 ---
 
-### Task 4: FrameCaptureService (alvo, ciclo de vida, retry) com fonte falsa
+### Task 4: FrameCaptureService (target, lifecycle, retry) with a fake source
 
 **Files:**
 - Create: `src/Supermonitor.Core/Frames/FrameCaptureService.cs`
@@ -2008,15 +2008,15 @@ git commit -m "feat(core): overlay content builder, metric catalog, placement an
 **Interfaces:**
 - Consumes: `FrameTimeAggregator`, `FrameStats`, `DemandTracker`, `Demand.FrameCapture`, `Log`.
 - Produces:
-  - `DemandTracker.Changed` — `event Action<Demand, bool>?`, disparado na thread de quem adquire/libera quando a contagem de um `Demand` passa de 0 para 1 (`true`) ou de 1 para 0 (`false`). Assinantes devem ser rápidos.
-  - `interface IPresentSource : IDisposable { event Action<int, double>? Presented; void Start(); }` — `Presented(processId, timestampMs)`, timestamp monotônico em milissegundos; `Start()` lança em caso de falha.
-  - `interface IForegroundProbe { int GetForegroundProcessId(); }` — 0 quando não há janela.
+  - `DemandTracker.Changed` — `event Action<Demand, bool>?`, fired on the thread of whoever acquires/releases when the count of a `Demand` goes from 0 to 1 (`true`) or from 1 to 0 (`false`). Subscribers must be fast.
+  - `interface IPresentSource : IDisposable { event Action<int, double>? Presented; void Start(); }` — `Presented(processId, timestampMs)`, monotonic timestamp in milliseconds; `Start()` throws on failure.
+  - `interface IForegroundProbe { int GetForegroundProcessId(); }` — 0 when there is no window.
   - `enum FrameCaptureState { Stopped, Running, Failed }`
-  - `sealed class FrameCaptureService : IDisposable` — construtor `(DemandTracker demand, Func<IPresentSource> sourceFactory, IForegroundProbe probe, TimeProvider time, int ownProcessId, bool runLoop = true)`; `FrameCaptureState State`, `string? FailureReason`, `int TargetProcessId`, `FrameStats Current`, `long FrameVersion`, `int CopyFrameTimes(Span<float>)`, `static readonly TimeSpan IdleAfter` (2 s), `RetryInterval` (30 s), `PollInterval` (250 ms); `internal void Poll()`.
+  - `sealed class FrameCaptureService : IDisposable` — constructor `(DemandTracker demand, Func<IPresentSource> sourceFactory, IForegroundProbe probe, TimeProvider time, int ownProcessId, bool runLoop = true)`; `FrameCaptureState State`, `string? FailureReason`, `int TargetProcessId`, `FrameStats Current`, `long FrameVersion`, `int CopyFrameTimes(Span<float>)`, `static readonly TimeSpan IdleAfter` (2 s), `RetryInterval` (30 s), `PollInterval` (250 ms); `internal void Poll()`.
 
-- [ ] **Step 1: Escrever os testes do `DemandTracker.Changed`**
+- [ ] **Step 1: Write the `DemandTracker.Changed` tests**
 
-Acrescente dentro de `DemandTrackerTests`:
+Add inside `DemandTrackerTests`:
 
 ```csharp
     [Fact]
@@ -2051,7 +2051,7 @@ Acrescente dentro de `DemandTrackerTests`:
     }
 ```
 
-- [ ] **Step 2: Escrever os testes do serviço**
+- [ ] **Step 2: Write the service tests**
 
 `tests/Supermonitor.Tests/Frames/FrameCaptureServiceTests.cs`:
 
@@ -2126,7 +2126,7 @@ public class FrameCaptureServiceTests
 
         public void Plan(Func<FakeSource> source) => _plans.Enqueue(source);
 
-        // Entrega `count` frames de 10 ms do processo (count + 1 presents), começando em `start`; devolve o último instante.
+        // Delivers `count` 10 ms frames for the process (count + 1 presents), starting at `start`; returns the last instant.
         public double Feed(int pid, double start, int count)
         {
             var timestamp = start;
@@ -2369,21 +2369,21 @@ public class FrameCaptureServiceTests
 }
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [ ] **Step 3: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (`Changed`, `FrameCaptureService` não existem).
+Expected: compile error (`Changed`, `FrameCaptureService` do not exist).
 
-- [ ] **Step 4: Implementar `DemandTracker.Changed`**
+- [ ] **Step 4: Implement `DemandTracker.Changed`**
 
-Em `src/Supermonitor.Core/Sensors/DemandTracker.cs` substitua a classe `DemandTracker` por:
+In `src/Supermonitor.Core/Sensors/DemandTracker.cs` replace the `DemandTracker` class with:
 
 ```csharp
 public sealed class DemandTracker
 {
     private readonly int[] _counts = new int[Enum.GetValues<Demand>().Length];
 
-    // Disparado na thread de quem adquire/libera, quando a contagem de um Demand passa de 0 para 1 ou de 1 para 0.
+    // Fired on the thread of whoever acquires/releases, when the count of a Demand goes from 0 to 1 or from 1 to 0.
     public event Action<Demand, bool>? Changed;
 
     public IDisposable Acquire(Demand demand)
@@ -2414,7 +2414,7 @@ public sealed class DemandTracker
 }
 ```
 
-- [ ] **Step 5: Implementar o serviço**
+- [ ] **Step 5: Implement the service**
 
 `src/Supermonitor.Core/Frames/FrameCaptureService.cs`:
 
@@ -2426,16 +2426,16 @@ namespace Supermonitor.Core.Frames;
 
 public interface IPresentSource : IDisposable
 {
-    // processId do app que apresentou e instante em ms (monotônico).
+    // processId of the app that presented and the instant in ms (monotonic).
     event Action<int, double>? Presented;
 
-    // Lança se a captura não puder começar.
+    // Throws if capture cannot start.
     void Start();
 }
 
 public interface IForegroundProbe
 {
-    // 0 quando não há janela em primeiro plano.
+    // 0 when there is no foreground window.
     int GetForegroundProcessId();
 }
 
@@ -2446,8 +2446,8 @@ public enum FrameCaptureState
     Failed,
 }
 
-// Liga a fonte de presents só enquanto existe uma lease Demand.FrameCapture, segue o processo em primeiro plano
-// e alimenta o FrameTimeAggregator. Falhas ao iniciar são reportadas e tentadas de novo a cada 30 s.
+// Turns the present source on only while a Demand.FrameCapture lease exists, follows the foreground process
+// and feeds the FrameTimeAggregator. Start failures are reported and retried every 30 s.
 public sealed class FrameCaptureService : IDisposable
 {
     public static readonly TimeSpan IdleAfter = TimeSpan.FromSeconds(2);
@@ -2490,7 +2490,7 @@ public sealed class FrameCaptureService : IDisposable
 
     public long FrameVersion => _aggregator.Version;
 
-    // Sem presents há mais de IdleAfter (jogo parou, alt-tab) volta a "sem dados".
+    // With no presents for longer than IdleAfter (game stopped, alt-tab) it goes back to "no data".
     public FrameStats Current
     {
         get
@@ -2602,7 +2602,7 @@ public sealed class FrameCaptureService : IDisposable
         Volatile.Write(ref _target, pid);
     }
 
-    // Thread do ETW.
+    // ETW thread.
     private void OnPresented(int pid, double timestampMs)
     {
         if (pid == 0 || pid != Volatile.Read(ref _target))
@@ -2655,7 +2655,7 @@ public sealed class FrameCaptureService : IDisposable
         finally
         {
             Volatile.Write(ref _loopActive, 0);
-            // A demanda pode ter voltado entre a última checagem e o fim do laço. Após uma exceção não reinicia, para não girar em falso.
+            // Demand may have returned between the last check and the end of the loop. After an exception it does not restart, to avoid spinning in vain.
             if (completed && !_cts.IsCancellationRequested && _demand.IsActive(Demand.FrameCapture))
             {
                 EnsureLoop();
@@ -2665,10 +2665,10 @@ public sealed class FrameCaptureService : IDisposable
 }
 ```
 
-- [ ] **Step 6: Rodar e ver passar**
+- [ ] **Step 6: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam. Se `The_loop_starts_the_source_when_demand_appears_and_stops_it_when_it_ends` ficar instável, aumente o timeout para 10 s; o laço usa `PeriodicTimer` sobre o `FakeTimeProvider`, então o avanço do tempo no teste é o que o acorda.
+Expected: all pass. If `The_loop_starts_the_source_when_demand_appears_and_stops_it_when_it_ends` becomes flaky, increase the timeout to 10 s; the loop uses `PeriodicTimer` over `FakeTimeProvider`, so advancing time in the test is what wakes it.
 
 - [ ] **Step 7: Commit**
 
@@ -2679,7 +2679,7 @@ git commit -m "feat(core): frame capture service with foreground target, idle de
 
 ---
 
-### Task 5: Fonte ETW real, sonda de primeiro plano e AppHost
+### Task 5: Real ETW source, foreground probe and AppHost
 
 **Files:**
 - Create: `src/Supermonitor.Core/Frames/EtwPresentSource.cs`, `src/Supermonitor.Core/Frames/ForegroundProbe.cs`
@@ -2689,11 +2689,11 @@ git commit -m "feat(core): frame capture service with foreground target, idle de
 **Interfaces:**
 - Consumes: `IPresentSource`, `IForegroundProbe`, `FrameCaptureService`, `Log`.
 - Produces:
-  - `sealed class EtwPresentSource : IPresentSource` com `const string SessionName = "Supermonitor-FPS"`.
+  - `sealed class EtwPresentSource : IPresentSource` with `const string SessionName = "Supermonitor-FPS"`.
   - `sealed class ForegroundProbe : IForegroundProbe`.
   - `AppHost.Frames` (`FrameCaptureService`).
 
-- [ ] **Step 1: Escrever os testes de fumaça (trait Hardware)**
+- [ ] **Step 1: Write the smoke tests (Hardware trait)**
 
 `tests/Supermonitor.Tests/Hardware/FrameCaptureSmokeTests.cs`:
 
@@ -2739,7 +2739,7 @@ public class FrameCaptureSmokeTests
         }
 
         Assert.DoesNotContain(EtwPresentSource.SessionName, TraceEventSession.GetActiveSessionNames());
-        // O número depende de haver janelas animando; só registramos.
+        // The number depends on there being animating windows; we only log it.
         Console.WriteLine($"present events received in 3 s: {received}");
     }
 
@@ -2751,7 +2751,7 @@ public class FrameCaptureSmokeTests
             Assert.Skip("ETW needs an administrator process; run the test runner elevated.");
         }
 
-        // Simula um crash anterior: a sessão continua ativa depois que o processo "morre".
+        // Simulates a previous crash: the session stays active after the process "dies".
         var orphan = new TraceEventSession(EtwPresentSource.SessionName) { StopOnDispose = false };
         orphan.EnableProvider(new Guid("802ec45a-1e99-4b83-9920-87c98277ba9d"), TraceEventLevel.Informational, 0x8000000);
         orphan.Dispose();
@@ -2783,20 +2783,20 @@ public class FrameCaptureSmokeTests
 }
 ```
 
-- [ ] **Step 2: Adicionar o pacote e verificar que o teste não compila ainda**
+- [ ] **Step 2: Add the package and verify the test does not compile yet**
 
-Em `src/Supermonitor.Core/Supermonitor.Core.csproj`, dentro do `ItemGroup` de pacotes:
+In `src/Supermonitor.Core/Supermonitor.Core.csproj`, inside the packages `ItemGroup`:
 
 ```xml
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.8" />
 ```
 
 Run: `dotnet build tests/Supermonitor.Tests 2>&1 | Select-String "error"`
-Expected: erros por `EtwPresentSource` e `ForegroundProbe` inexistentes.
+Expected: errors because `EtwPresentSource` and `ForegroundProbe` do not exist.
 
 - [ ] **Step 3: P/Invoke**
 
-Em `src/Supermonitor.Core/Interop/User32.cs`, dentro da classe, acrescente:
+In `src/Supermonitor.Core/Interop/User32.cs`, inside the class, add:
 
 ```csharp
     [LibraryImport("user32.dll")]
@@ -2806,7 +2806,7 @@ Em `src/Supermonitor.Core/Interop/User32.cs`, dentro da classe, acrescente:
     public static partial uint GetWindowThreadProcessId(nint hwnd, out uint processId);
 ```
 
-- [ ] **Step 4: Implementar a sonda e a fonte ETW**
+- [ ] **Step 4: Implement the probe and the ETW source**
 
 `src/Supermonitor.Core/Frames/ForegroundProbe.cs`:
 
@@ -2840,7 +2840,7 @@ using Supermonitor.Core.Diagnostics;
 
 namespace Supermonitor.Core.Frames;
 
-// Um evento por present (DxgKrnl, id 184) de qualquer processo; o ProcessID do cabeçalho é o do app que apresenta.
+// One event per present (DxgKrnl, id 184) from any process; the header ProcessID is that of the presenting app.
 public sealed class EtwPresentSource : IPresentSource
 {
     public const string SessionName = "Supermonitor-FPS";
@@ -2861,7 +2861,7 @@ public sealed class EtwPresentSource : IPresentSource
             throw new UnauthorizedAccessException("FPS capture needs administrator rights.");
         }
 
-        // O construtor padrão (Create) para e recria uma sessão órfã com o mesmo nome, deixada por um crash anterior.
+        // The default constructor (Create) stops and recreates an orphan session with the same name left by a previous crash.
         var session = new TraceEventSession(SessionName);
         try
         {
@@ -2896,7 +2896,7 @@ public sealed class EtwPresentSource : IPresentSource
             return;
         }
 
-        // Parar a sessão faz Process() retornar.
+        // Stopping the session makes Process() return.
         session.Dispose();
         try
         {
@@ -2917,29 +2917,29 @@ public sealed class EtwPresentSource : IPresentSource
 }
 ```
 
-- [ ] **Step 5: Ligar ao `AppHost`**
+- [ ] **Step 5: Wire into `AppHost`**
 
-Em `src/Supermonitor.Core/AppHost.cs`: adicione `using Supermonitor.Core.Frames;`, a propriedade `public FrameCaptureService Frames { get; }`, o parâmetro `FrameCaptureService frames` no construtor privado (`Frames = frames;`) e, em `Create()`, depois de criar `demand`:
+In `src/Supermonitor.Core/AppHost.cs`: add `using Supermonitor.Core.Frames;`, the property `public FrameCaptureService Frames { get; }`, the parameter `FrameCaptureService frames` in the private constructor (`Frames = frames;`) and, in `Create()`, after creating `demand`:
 
 ```csharp
         var frames = new FrameCaptureService(demand, () => new EtwPresentSource(), new ForegroundProbe(), TimeProvider.System, Environment.ProcessId);
 ```
 
-passando `frames` ao construtor `new AppHost(...)`. Em `DisposeAsync()`, antes de `await Hub.DisposeAsync()`:
+passing `frames` to the `new AppHost(...)` constructor. In `DisposeAsync()`, before `await Hub.DisposeAsync()`:
 
 ```csharp
         Frames.Dispose();
 ```
 
-- [ ] **Step 6: Rodar os testes**
+- [ ] **Step 6: Run the tests**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam (os de hardware não rodam aqui).
+Expected: all pass (the hardware ones do not run here).
 
-Run (shell sem elevação): `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Hardware.FrameCaptureSmokeTests"`
-Expected: `Foreground_probe...` e `Etw_source_without_administrator_rights...` passam; os dois testes que exigem administrador aparecem como ignorados.
+Run (non-elevated shell): `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Hardware.FrameCaptureSmokeTests"`
+Expected: `Foreground_probe...` and `Etw_source_without_administrator_rights...` pass; the two tests that require administrator show as skipped.
 
-Run (terminal elevado — o usuário abre um PowerShell como administrador e roda o mesmo comando): os dois testes ETW passam e `present events received in 3 s: N` é impresso. N > 0 é esperado com qualquer janela animando; N = 0 não reprova o teste, mas investigue antes de seguir (a Task 10 depende disso).
+Run (elevated terminal — the user opens a PowerShell as administrator and runs the same command): the two ETW tests pass and `present events received in 3 s: N` is printed. N > 0 is expected with any animating window; N = 0 does not fail the test, but investigate before moving on (Task 10 depends on it).
 
 - [ ] **Step 7: Commit**
 
@@ -2950,7 +2950,7 @@ git commit -m "feat(core): ETW present source, foreground probe and AppHost wiri
 
 ---
 
-### Task 6: Projeto Supermonitor.Overlay e OverlayRenderer (Direct2D → DIB)
+### Task 6: Supermonitor.Overlay project and OverlayRenderer (Direct2D → DIB)
 
 **Files:**
 - Create: `src/Supermonitor.Overlay/Supermonitor.Overlay.csproj`, `src/Supermonitor.Overlay/Interop/Gdi32.cs`, `src/Supermonitor.Overlay/OverlayRenderer.cs`
@@ -2958,12 +2958,12 @@ git commit -m "feat(core): ETW present source, foreground probe and AppHost wiri
 - Test: `tests/Supermonitor.Tests/Overlay/OverlayRendererTests.cs`
 
 **Interfaces:**
-- Consumes: `OverlayFrame`, `OverlayRow`, `OverlayStyle`, `OverlayLayout`, `Rgba` (Task 3 e 2).
+- Consumes: `OverlayFrame`, `OverlayRow`, `OverlayStyle`, `OverlayLayout`, `Rgba` (Tasks 3 and 2).
 - Produces (namespace `Supermonitor.Overlay`):
-  - `readonly record struct OverlayBitmap(nint Hdc, nint Bits, int Width, int Height)` com `ReadOnlySpan<byte> Pixels` (BGRA premultiplicado, top-down, `Width * Height * 4` bytes). Válido até a próxima chamada de `Render` do mesmo renderizador.
-  - `sealed class OverlayRenderer : IDisposable` com `OverlayBitmap Render(OverlayFrame frame, OverlayStyle style, float scale)`. **Thread-affine**: use sempre da mesma thread (a fábrica Direct2D é single-thread). `scale` = DPI do monitor / 96; fonte, padding, raio, gráfico e gaps são multiplicados por ele.
+  - `readonly record struct OverlayBitmap(nint Hdc, nint Bits, int Width, int Height)` with `ReadOnlySpan<byte> Pixels` (premultiplied BGRA, top-down, `Width * Height * 4` bytes). Valid until the next `Render` call of the same renderer.
+  - `sealed class OverlayRenderer : IDisposable` with `OverlayBitmap Render(OverlayFrame frame, OverlayStyle style, float scale)`. **Thread-affine**: always use it from the same thread (the Direct2D factory is single-threaded). `scale` = monitor DPI / 96; font, padding, radius, chart and gaps are multiplied by it.
 
-- [ ] **Step 1: Criar o projeto e referenciá-lo**
+- [ ] **Step 1: Create the project and reference it**
 
 `src/Supermonitor.Overlay/Supermonitor.Overlay.csproj`:
 
@@ -2981,22 +2981,22 @@ git commit -m "feat(core): ETW present source, foreground probe and AppHost wiri
 </Project>
 ```
 
-Em `Supermonitor.slnx`, dentro de `<Folder Name="/src/">`, depois do projeto Core:
+In `Supermonitor.slnx`, inside `<Folder Name="/src/">`, after the Core project:
 
 ```xml
     <Project Path="src/Supermonitor.Overlay/Supermonitor.Overlay.csproj" />
 ```
 
-Em `tests/Supermonitor.Tests/Supermonitor.Tests.csproj`, ao lado do `ProjectReference` do Core:
+In `tests/Supermonitor.Tests/Supermonitor.Tests.csproj`, next to the Core `ProjectReference`:
 
 ```xml
     <ProjectReference Include="..\..\src\Supermonitor.Overlay\Supermonitor.Overlay.csproj" />
 ```
 
 Run: `dotnet build tests/Supermonitor.Tests 2>&1 | Select-String "error|Erro"`
-Expected: `0 Erro(s)` (restaura os pacotes Vortice).
+Expected: no errors (`0 Error(s)`; restores the Vortice packages).
 
-- [ ] **Step 2: Escrever os testes do renderizador**
+- [ ] **Step 2: Write the renderer tests**
 
 `tests/Supermonitor.Tests/Overlay/OverlayRendererTests.cs`:
 
@@ -3090,7 +3090,7 @@ public sealed class OverlayRendererTests : IDisposable
 
         var doubled = _renderer.Render(Frame(2), Style(), 2);
 
-        // A métrica do DirectWrite arredonda por glifo; 10% de tolerância cobre isso.
+        // DirectWrite metrics round per glyph; a 10% tolerance covers that.
         Assert.InRange(doubled.Width, normalWidth * 2 * 0.9, normalWidth * 2 * 1.1);
         Assert.InRange(doubled.Height, normalHeight * 2 * 0.9, normalHeight * 2 * 1.1);
     }
@@ -3199,12 +3199,12 @@ public sealed class OverlayRendererTests : IDisposable
 }
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [ ] **Step 3: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Overlay.OverlayRendererTests"`
-Expected: erro de compilação (`OverlayRenderer` não existe).
+Expected: compile error (`OverlayRenderer` does not exist).
 
-- [ ] **Step 4: P/Invoke do GDI**
+- [ ] **Step 4: GDI P/Invoke**
 
 `src/Supermonitor.Overlay/Interop/Gdi32.cs`:
 
@@ -3250,7 +3250,7 @@ internal static partial class Gdi32
 }
 ```
 
-- [ ] **Step 5: Implementar o renderizador**
+- [ ] **Step 5: Implement the renderer**
 
 `src/Supermonitor.Overlay/OverlayRenderer.cs`:
 
@@ -3272,8 +3272,8 @@ public readonly record struct OverlayBitmap(nint Hdc, nint Bits, int Width, int 
     public unsafe ReadOnlySpan<byte> Pixels => new((void*)Bits, Width * Height * 4);
 }
 
-// Desenha o OverlayFrame com Direct2D/DirectWrite num DIB 32 bits premultiplicado (o formato do UpdateLayeredWindow).
-// Não toca em janelas: o overlay apresenta o DIB e o preview do editor copia os pixels.
+// Draws the OverlayFrame with Direct2D/DirectWrite into a premultiplied 32-bit DIB (the UpdateLayeredWindow format).
+// Does not touch windows: the overlay presents the DIB and the editor preview copies the pixels.
 public sealed class OverlayRenderer : IDisposable
 {
     private readonly ID2D1Factory1 _d2d = D2D1.D2D1CreateFactory<ID2D1Factory1>();
@@ -3383,7 +3383,7 @@ public sealed class OverlayRenderer : IDisposable
         _d2d.Dispose();
     }
 
-    // Preenche as posições de cada linha e devolve o tamanho do bloco de texto.
+    // Fills in the position of each row and returns the size of the text block.
     private static (float Width, float Height) Arrange(OverlayLayout layout, IDWriteTextLayout[] labels, IDWriteTextLayout[] values, float fontSize, float[] labelX, float[] valueX, float[] rowY)
     {
         var count = labels.Length;
@@ -3527,12 +3527,12 @@ public sealed class OverlayRenderer : IDisposable
 }
 ```
 
-Se `target.DrawLine(previous, point, brush, width)` não compilar na versão 3.8.3 (assinatura com `ID2D1StrokeStyle?` obrigatório), passe `null` como último argumento. Se `IDWriteTextLayout.Metrics` expuser `Width`/`Height` com nomes diferentes, use `WidthIncludingTrailingWhitespace` ou `LayoutWidth` conforme o IntelliSense; o spike usou `layout.Metrics.Width`.
+If `target.DrawLine(previous, point, brush, width)` does not compile in version 3.8.3 (signature with mandatory `ID2D1StrokeStyle?`), pass `null` as the last argument. If `IDWriteTextLayout.Metrics` exposes `Width`/`Height` under different names, use `WidthIncludingTrailingWhitespace` or `LayoutWidth` according to IntelliSense; the spike used `layout.Metrics.Width`.
 
-- [ ] **Step 6: Rodar e ver passar**
+- [ ] **Step 6: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam (incluindo os 12 do renderizador).
+Expected: all pass (including the 12 renderer ones).
 
 - [ ] **Step 7: Commit**
 
@@ -3543,7 +3543,7 @@ git commit -m "feat(overlay): Direct2D overlay renderer drawing into a premultip
 
 ---
 
-### Task 7: Janela layered, monitores e OverlayService
+### Task 7: Layered window, monitors and OverlayService
 
 **Files:**
 - Create: `src/Supermonitor.Overlay/Interop/User32.cs`, `src/Supermonitor.Overlay/Interop/Shcore.cs`, `src/Supermonitor.Overlay/Interop/Kernel32.cs`, `src/Supermonitor.Overlay/MonitorCatalog.cs`, `src/Supermonitor.Overlay/LiveOverlayValues.cs`, `src/Supermonitor.Overlay/OverlayWindow.cs`, `src/Supermonitor.Overlay/OverlayService.cs`
@@ -3552,11 +3552,11 @@ git commit -m "feat(overlay): Direct2D overlay renderer drawing into a premultip
 **Interfaces:**
 - Consumes: `OverlayRenderer`, `OverlayBitmap`, `OverlayFrameBuilder`, `OverlayPlacement`, `PixelRect`, `OverlayDemand`, `OverlayRefresh`, `IOverlayValues`, `AppHost`, `FrameCaptureService`, `MetricStore`, `Demand`.
 - Produces (namespace `Supermonitor.Overlay`):
-  - `sealed record MonitorInfo(string Id, string Name, PixelRect Bounds, bool IsPrimary, float Scale)`; `static class MonitorCatalog { IReadOnlyList<MonitorInfo> Enumerate(); MonitorInfo? Resolve(IReadOnlyList<MonitorInfo> monitors, string? id); }` — `Resolve` devolve o monitor com o `Id`, senão o primário, senão o primeiro, senão `null`.
+  - `sealed record MonitorInfo(string Id, string Name, PixelRect Bounds, bool IsPrimary, float Scale)`; `static class MonitorCatalog { IReadOnlyList<MonitorInfo> Enumerate(); MonitorInfo? Resolve(IReadOnlyList<MonitorInfo> monitors, string? id); }` — `Resolve` returns the monitor with the `Id`, otherwise the primary, otherwise the first, otherwise `null`.
   - `sealed class LiveOverlayValues(MetricStore store, FrameCaptureService frames, TimeProvider time) : IOverlayValues`.
-  - `sealed class OverlayService : IDisposable` — `OverlayService(AppHost host)`; `void Apply()` (relê `host.Settings.Current.Overlay`, qualquer thread), `bool Enabled`, `void SetEnabled(bool enabled)` (grava, salva e aplica), `event Action? Changed` (disparado por `SetEnabled`, na thread de quem chamou).
+  - `sealed class OverlayService : IDisposable` — `OverlayService(AppHost host)`; `void Apply()` (rereads `host.Settings.Current.Overlay`, any thread), `bool Enabled`, `void SetEnabled(bool enabled)` (writes, saves and applies), `event Action? Changed` (fired by `SetEnabled`, on the caller's thread).
 
-- [ ] **Step 1: Escrever os testes**
+- [ ] **Step 1: Write the tests**
 
 `tests/Supermonitor.Tests/Overlay/MonitorCatalogTests.cs`:
 
@@ -3711,10 +3711,10 @@ public class OverlayWindowSmokeTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (`MonitorInfo`, `MonitorCatalog`, `LiveOverlayValues` não existem).
+Expected: compile error (`MonitorInfo`, `MonitorCatalog`, `LiveOverlayValues` do not exist).
 
 - [ ] **Step 3: P/Invoke**
 
@@ -3915,7 +3915,7 @@ internal static unsafe partial class User32
 }
 ```
 
-- [ ] **Step 4: Monitores e valores ao vivo**
+- [ ] **Step 4: Monitors and live values**
 
 `src/Supermonitor.Overlay/MonitorCatalog.cs`:
 
@@ -3985,7 +3985,7 @@ using Supermonitor.Core.Overlay;
 
 namespace Supermonitor.Overlay;
 
-// Lê o último valor de cada métrica da MetricStore e os números de FPS do FrameCaptureService.
+// Reads the latest value of each metric from the MetricStore and the FPS numbers from the FrameCaptureService.
 public sealed class LiveOverlayValues(MetricStore store, FrameCaptureService frames, TimeProvider time) : IOverlayValues
 {
     public DateTime Now => time.GetLocalNow().DateTime;
@@ -4004,7 +4004,7 @@ public sealed class LiveOverlayValues(MetricStore store, FrameCaptureService fra
 }
 ```
 
-- [ ] **Step 5: A janela layered**
+- [ ] **Step 5: The layered window**
 
 `src/Supermonitor.Overlay/OverlayWindow.cs`:
 
@@ -4015,8 +4015,8 @@ using Supermonitor.Overlay.Interop;
 
 namespace Supermonitor.Overlay;
 
-// Janela Win32 layered, click-through, sempre no topo, sem foco e fora do Alt+Tab.
-// Precisa ser criada e usada na thread que roda o laço de mensagens.
+// Layered Win32 window, click-through, always on top, without focus and outside Alt+Tab.
+// It must be created and used on the thread that runs the message loop.
 internal sealed unsafe class OverlayWindow : IDisposable
 {
     private const string ClassName = "Supermonitor.Overlay";
@@ -4055,7 +4055,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
 
     public nint Handle { get; private set; }
 
-    // Troca o conteúdo e a posição de uma vez; o DIB já vem premultiplicado.
+    // Swaps content and position at once; the DIB already comes premultiplied.
     public void Present(OverlayBitmap bitmap, int x, int y)
     {
         var position = new User32.POINT { X = x, Y = y };
@@ -4072,7 +4072,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
 
     public void Hide() => User32.ShowWindow(Handle, User32.SW_HIDE);
 
-    // Jogos borderless também são topmost; reafirmar a ordem de tempos em tempos mantém o overlay por cima.
+    // Borderless games are also topmost; reasserting the order from time to time keeps the overlay on top.
     public void KeepOnTop() =>
         User32.SetWindowPos(Handle, User32.HWND_TOPMOST, 0, 0, 0, 0, User32.SWP_NOMOVE | User32.SWP_NOSIZE | User32.SWP_NOACTIVATE);
 
@@ -4105,7 +4105,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
 }
 ```
 
-- [ ] **Step 6: O serviço**
+- [ ] **Step 6: The service**
 
 `src/Supermonitor.Overlay/OverlayService.cs`:
 
@@ -4121,8 +4121,8 @@ using Supermonitor.Overlay.Interop;
 
 namespace Supermonitor.Overlay;
 
-// Dono da janela do overlay. Uma thread própria roda o laço de mensagens, desenha na taxa configurada
-// e só redesenha quando algum texto (ou o gráfico) mudou. Segura as leases de demanda enquanto visível.
+// Owner of the overlay window. A dedicated thread runs the message loop, draws at the configured rate
+// and only redraws when some text (or the chart) changed. Holds the demand leases while visible.
 public sealed unsafe class OverlayService : IDisposable
 {
     private const nuint RenderTimerId = 1;
@@ -4138,7 +4138,7 @@ public sealed unsafe class OverlayService : IDisposable
     private nint _handle;
     private bool _disposed;
 
-    // Estado da thread do overlay.
+    // Overlay thread state.
     private Runtime _current = new(false, null, new OverlayStyle(), UnitOptions.Default, new Dictionary<string, MetricThreshold>());
     private OverlayWindow? _window;
     private OverlayRenderer? _renderer;
@@ -4172,7 +4172,7 @@ public sealed unsafe class OverlayService : IDisposable
         Changed?.Invoke();
     }
 
-    // Tira uma cópia das configurações (chamar na thread que as altera) e avisa a thread do overlay.
+    // Takes a copy of the settings (call it on the thread that changes them) and notifies the overlay thread.
     public void Apply()
     {
         var settings = _host.Settings.Current;
@@ -4254,7 +4254,7 @@ public sealed unsafe class OverlayService : IDisposable
         }
         catch (Exception ex)
         {
-            // Um erro por vez no log: a 30 Hz, repetir a mesma falha inundaria o arquivo.
+            // One error at a time in the log: at 30 Hz, repeating the same failure would flood the file.
             if (!_failing)
             {
                 _failing = true;
@@ -4343,7 +4343,7 @@ public sealed unsafe class OverlayService : IDisposable
         _failing = false;
     }
 
-    // Monitor escolhido (ou o primário se sumiu); mudou de posição, tamanho ou DPI → redesenha.
+    // Chosen monitor (or the primary if it disappeared); changed position, size or DPI → redraw.
     private void RefreshMonitor()
     {
         var resolved = MonitorCatalog.Resolve(MonitorCatalog.Enumerate(), _current.MonitorId);
@@ -4384,16 +4384,16 @@ public sealed unsafe class OverlayService : IDisposable
 }
 ```
 
-- [ ] **Step 7: Rodar e ver passar**
+- [ ] **Step 7: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Hardware.OverlayWindowSmokeTests"`
-Expected: passa (monitores enumerados, um primário, escala entre 1 e 4).
+Expected: passes (monitors enumerated, one primary, scale between 1 and 4).
 
 Run: `dotnet build src/Supermonitor.Overlay -p:Platform=x64 2>&1 | Select-String "error|Erro"`
-Expected: `0 Erro(s)`. Se `delegate* unmanaged[Stdcall]` em `LibraryImport` for rejeitado pelo gerador, troque o parâmetro por `nint callback` e passe `(nint)(delegate* unmanaged[Stdcall]<nint, nint, User32.RECT*, nint, int>)&OnMonitor`.
+Expected: no errors (`0 Error(s)`). If `delegate* unmanaged[Stdcall]` in `LibraryImport` is rejected by the generator, replace the parameter with `nint callback` and pass `(nint)(delegate* unmanaged[Stdcall]<nint, nint, User32.RECT*, nint, int>)&OnMonitor`.
 
 - [ ] **Step 8: Commit**
 
@@ -4404,7 +4404,7 @@ git commit -m "feat(overlay): layered overlay window, monitor catalog and overla
 
 ---
 
-### Task 8: Integração no app (OverlayService e item de bandeja)
+### Task 8: App integration (OverlayService and tray item)
 
 **Files:**
 - Modify: `src/Supermonitor.Core/Interop/User32.cs`, `src/Supermonitor.Core/Shell/TrayIcon.cs`, `src/Supermonitor/Supermonitor.csproj`, `src/Supermonitor/App.xaml.cs`
@@ -4412,26 +4412,26 @@ git commit -m "feat(overlay): layered overlay window, monitor catalog and overla
 **Interfaces:**
 - Consumes: `OverlayService` (Task 7), `TrayIcon`, `AppHost`.
 - Produces:
-  - `TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit, Func<bool>? isOverlayEnabled = null, Action? onToggleOverlay = null)` — com os dois últimos preenchidos, o menu ganha o item "Show overlay" marcado quando ligado.
-  - `App.Overlay` (`OverlayService?`) — a página do editor (Task 9) usa para aplicar mudanças.
+  - `TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit, Func<bool>? isOverlayEnabled = null, Action? onToggleOverlay = null)` — with the last two filled in, the menu gains the "Show overlay" item, checked when on.
+  - `App.Overlay` (`OverlayService?`) — the editor page (Task 9) uses it to apply changes.
 
-Esta task não tem teste de unidade (bandeja e janela dependem de sessão de desktop); a verificação é manual no fim.
+This task has no unit test (tray and window depend on a desktop session); verification is manual at the end.
 
-- [ ] **Step 1: Constante do menu**
+- [ ] **Step 1: Menu constant**
 
-Em `src/Supermonitor.Core/Interop/User32.cs`, junto de `MF_STRING`:
+In `src/Supermonitor.Core/Interop/User32.cs`, next to `MF_STRING`:
 
 ```csharp
     public const uint MF_CHECKED = 0x0008;
 ```
 
-- [ ] **Step 2: Item de menu na bandeja**
+- [ ] **Step 2: Tray menu item**
 
-Em `src/Supermonitor.Core/Shell/TrayIcon.cs`:
+In `src/Supermonitor.Core/Shell/TrayIcon.cs`:
 
-1. Constante `private const int MenuOverlay = 3;`.
-2. Campos `private readonly Func<bool>? _isOverlayEnabled;` e `private readonly Action? _onToggleOverlay;`.
-3. Construtor:
+1. Constant `private const int MenuOverlay = 3;`.
+2. Fields `private readonly Func<bool>? _isOverlayEnabled;` and `private readonly Action? _onToggleOverlay;`.
+3. Constructor:
 
 ```csharp
     public TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit, Func<bool>? isOverlayEnabled = null, Action? onToggleOverlay = null)
@@ -4443,9 +4443,9 @@ Em `src/Supermonitor.Core/Shell/TrayIcon.cs`:
         _onToggleOverlay = onToggleOverlay;
 ```
 
-(o restante do construtor fica como está).
+(the rest of the constructor stays as is).
 
-4. Em `ShowMenu()`, entre "Open Supermonitor" e o separador:
+4. In `ShowMenu()`, between "Open Supermonitor" and the separator:
 
 ```csharp
         User32.AppendMenuW(menu, User32.MF_STRING, MenuOpen, "Open Supermonitor");
@@ -4458,7 +4458,7 @@ Em `src/Supermonitor.Core/Shell/TrayIcon.cs`:
         User32.AppendMenuW(menu, User32.MF_SEPARATOR, 0, null);
 ```
 
-5. No tratamento do comando, depois do `MenuExit`:
+5. In the command handling, after `MenuExit`:
 
 ```csharp
         else if (command == MenuOverlay)
@@ -4467,27 +4467,27 @@ Em `src/Supermonitor.Core/Shell/TrayIcon.cs`:
         }
 ```
 
-- [ ] **Step 3: Referenciar o projeto Overlay**
+- [ ] **Step 3: Reference the Overlay project**
 
-Em `src/Supermonitor/Supermonitor.csproj`, no `ItemGroup` de `ProjectReference`:
+In `src/Supermonitor/Supermonitor.csproj`, in the `ProjectReference` `ItemGroup`:
 
 ```xml
     <ProjectReference Include="..\Supermonitor.Overlay\Supermonitor.Overlay.csproj" />
 ```
 
-- [ ] **Step 4: Ligar no `App`**
+- [ ] **Step 4: Wire into `App`**
 
-Em `src/Supermonitor/App.xaml.cs`:
+In `src/Supermonitor/App.xaml.cs`:
 
 1. `using Supermonitor.Overlay;`
-2. Campo `private OverlayService? _overlay;` e propriedade pública `public OverlayService? Overlay => _overlay;` (junto de `PawnIoBannerDismissed`).
-3. Em `OnLaunched`, depois de `_host.Start();` e antes de criar a bandeja:
+2. Field `private OverlayService? _overlay;` and public property `public OverlayService? Overlay => _overlay;` (next to `PawnIoBannerDismissed`).
+3. In `OnLaunched`, after `_host.Start();` and before creating the tray:
 
 ```csharp
         _overlay = new OverlayService(_host);
 ```
 
-e na criação da bandeja:
+and in the tray creation:
 
 ```csharp
         _tray = new TrayIcon(
@@ -4499,30 +4499,30 @@ e na criação da bandeja:
             onToggleOverlay: () => _dispatcher.TryEnqueue(() => _overlay?.SetEnabled(_overlay.Enabled == false)));
 ```
 
-4. Em `ExitApp()`, depois de `_window?.Close();` e antes do `_host.DisposeAsync()`:
+4. In `ExitApp()`, after `_window?.Close();` and before `_host.DisposeAsync()`:
 
 ```csharp
             _overlay?.Dispose();
 ```
 
-- [ ] **Step 5: Compilar**
+- [ ] **Step 5: Build**
 
-Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -o <pasta temporária> 2>&1 | Select-String "error|Erro"`
-Expected: `0 Erro(s)`.
+Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -o <temporary folder> 2>&1 | Select-String "error|Erro"`
+Expected: no errors (`0 Error(s)`).
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
-- [ ] **Step 6: Verificação manual (usuário)**
+- [ ] **Step 6: Manual verification (user)**
 
-O usuário sai do app pela bandeja, o assistente recompila e abre o app elevado. Conferir, nesta ordem:
+The user exits the app through the tray, the assistant rebuilds and opens the elevated app. Check, in this order:
 
-1. Menu da bandeja mostra "Show overlay" sem marca. Clicar: o overlay aparece no canto superior esquerdo (preset Default, 16 px de margem) e a marca aparece ao reabrir o menu.
-2. Clicar em outra janela que anime (vídeo, página com animação): FPS e frametime aparecem e o mini-gráfico se move. Clicar numa janela parada: FPS volta a `N/A` em ~2 s.
-3. O overlay não rouba o foco, o clique passa através dele e ele não aparece no Alt+Tab.
-4. CPU, RAM e GPU do overlay batem com o Gerenciador de Tarefas (±2 pontos).
-5. Desligar pelo menu: o overlay some. `%LocalAppData%\Supermonitor\settings.json` tem `"overlay": { "enabled": ... }` e `"version": 3`.
-6. Sair pelo menu "Exit": `logman query -ets` (PowerShell elevado) não lista `Supermonitor-FPS`.
+1. Tray menu shows "Show overlay" unchecked. Click it: the overlay appears in the top-left corner (Default preset, 16 px margin) and the check mark appears when the menu is reopened.
+2. Click another window that animates (video, page with animation): FPS and frametime appear and the mini-chart moves. Click a still window: FPS goes back to `N/A` in ~2 s.
+3. The overlay does not steal focus, clicks pass through it and it does not appear in Alt+Tab.
+4. The overlay's CPU, RAM and GPU match Task Manager (±2 points).
+5. Turn off through the menu: the overlay disappears. `%LocalAppData%\Supermonitor\settings.json` has `"overlay": { "enabled": ... }` and `"version": 3`.
+6. Exit through the "Exit" menu: `logman query -ets` (elevated PowerShell) does not list `Supermonitor-FPS`.
 
 - [ ] **Step 7: Commit**
 
@@ -4533,7 +4533,7 @@ git commit -m "feat(app): run the overlay service and toggle it from the tray me
 
 ---
 
-### Task 9: Página Overlay (editor com preview ao vivo e presets)
+### Task 9: Overlay page (editor with live preview and presets)
 
 **Files:**
 - Create: `src/Supermonitor/Views/OverlayPage.xaml`, `src/Supermonitor/Views/OverlayPage.xaml.cs`, `src/Supermonitor/Dialogs/OverlayItemDialog.cs`
@@ -4541,13 +4541,13 @@ git commit -m "feat(app): run the overlay service and toggle it from the tray me
 
 **Interfaces:**
 - Consumes: `OverlayEditor`, `OverlayPresets`, `OverlaySettings`, `OverlayStyle`, `OverlayItemSettings`, `OverlayMetric`, `OverlayMetricCatalog`, `OverlayFrameBuilder`, `DemoOverlayValues`, `OverlayRenderer`, `MonitorCatalog`, `OverlayService` (via `App.Current.Overlay`), `PageContext`, `ColorText`, `SettingsStore`.
-- Produces: item de navegação "Overlay" (tag `overlay`); `OverlayItemDialog(OverlayItemSettings item)` com `OverlayItemSettings Result`.
+- Produces: "Overlay" navigation item (tag `overlay`); `OverlayItemDialog(OverlayItemSettings item)` with `OverlayItemSettings Result`.
 
-Esta task é de interface; os testes vêm das Tasks 2 e 3 (lógica) e da verificação manual no fim.
+This task is UI; the tests come from Tasks 2 and 3 (logic) and from the manual verification at the end.
 
-- [ ] **Step 1: Item de navegação**
+- [ ] **Step 1: Navigation item**
 
-Em `src/Supermonitor/MainWindow.xaml`, depois do item "Processes":
+In `src/Supermonitor/MainWindow.xaml`, after the "Processes" item:
 
 ```xml
                 <NavigationViewItem Content="Overlay" Tag="overlay">
@@ -4557,7 +4557,7 @@ Em `src/Supermonitor/MainWindow.xaml`, depois do item "Processes":
                 </NavigationViewItem>
 ```
 
-Em `MainWindow.xaml.cs`, no `switch` de `Navigate`, antes de `case "settings":`:
+In `MainWindow.xaml.cs`, in the `switch` of `Navigate`, before `case "settings":`:
 
 ```csharp
             case "overlay":
@@ -4565,7 +4565,7 @@ Em `MainWindow.xaml.cs`, no `switch` de `Navigate`, antes de `case "settings":`:
                 break;
 ```
 
-- [ ] **Step 2: Diálogo de cores e limiares por item**
+- [ ] **Step 2: Per-item colors and thresholds dialog**
 
 `src/Supermonitor/Dialogs/OverlayItemDialog.cs`:
 
@@ -4654,7 +4654,7 @@ public sealed class OverlayItemDialog : ContentDialog
 }
 ```
 
-- [ ] **Step 3: XAML da página**
+- [ ] **Step 3: Page XAML**
 
 `src/Supermonitor/Views/OverlayPage.xaml`:
 
@@ -4921,7 +4921,7 @@ public sealed partial class OverlayPage : Page
         UpdateCaptureStatus();
     });
 
-    // Copia as configurações para os controles.
+    // Copies the settings into the controls.
     private void Reload()
     {
         _loading = true;
@@ -4951,7 +4951,7 @@ public sealed partial class OverlayPage : Page
         RefreshPreview();
     }
 
-    // Grava, aplica no overlay real e atualiza preview e seleção de preset.
+    // Saves, applies to the real overlay and updates the preview and preset selection.
     private void Commit()
     {
         _host!.Settings.RequestSave();
@@ -5093,7 +5093,7 @@ public sealed partial class OverlayPage : Page
         }
     }
 
-    // ----- posição -----
+    // ----- position -----
 
     private void FillMonitors()
     {
@@ -5183,7 +5183,7 @@ public sealed partial class OverlayPage : Page
         Commit();
     }
 
-    // ----- métricas -----
+    // ----- metrics -----
 
     private void RebuildItems()
     {
@@ -5285,7 +5285,7 @@ public sealed partial class OverlayPage : Page
         }
     }
 
-    // ----- texto, cores e fundo -----
+    // ----- text, colors and background -----
 
     private void FillFonts()
     {
@@ -5391,28 +5391,28 @@ public sealed partial class OverlayPage : Page
 }
 ```
 
-Observações para quem executa:
-- A propriedade privada da página se chama `Look` (e não `Style`) para não esconder `FrameworkElement.Style`. `Overlay` também é o nome de um namespace (`Supermonitor.Overlay`), mas dentro da classe o nome simples resolve para a propriedade; se o compilador reclamar de ambiguidade em `Overlay.Enabled`, renomeie a propriedade para `Config`.
-- `ColorText.ToHex` existe em `Supermonitor.Core.Settings`. `Windows.UI.Color` precisa de `using Windows.UI;` (já incluído).
-- `Application.Current.Resources["SystemFillColorCriticalBrush"]` é o mesmo recurso usado em `MetricCard.xaml.cs`.
-- `PixelBuffer.AsStream()` vem de `System.Runtime.InteropServices.WindowsRuntime` (já importado). Se a extensão não resolver, use `Marshal`/`IBufferByteAccess`: obtenha o ponteiro com `((IBufferByteAccess)(object)_bitmap.PixelBuffer).Buffer` e copie com `Marshal.Copy`.
+Notes for the implementer:
+- The page's private property is called `Look` (and not `Style`) so it does not hide `FrameworkElement.Style`. `Overlay` is also the name of a namespace (`Supermonitor.Overlay`), but inside the class the simple name resolves to the property; if the compiler complains about ambiguity in `Overlay.Enabled`, rename the property to `Config`.
+- `ColorText.ToHex` exists in `Supermonitor.Core.Settings`. `Windows.UI.Color` needs `using Windows.UI;` (already included).
+- `Application.Current.Resources["SystemFillColorCriticalBrush"]` is the same resource used in `MetricCard.xaml.cs`.
+- `PixelBuffer.AsStream()` comes from `System.Runtime.InteropServices.WindowsRuntime` (already imported). If the extension does not resolve, use `Marshal`/`IBufferByteAccess`: get the pointer with `((IBufferByteAccess)(object)_bitmap.PixelBuffer).Buffer` and copy with `Marshal.Copy`.
 
-- [ ] **Step 5: Compilar**
+- [ ] **Step 5: Build**
 
-Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -o <pasta temporária> 2>&1 | Select-String "error|Erro"`
-Expected: `0 Erro(s)`. Corrija erros de XAML/C# antes de seguir.
+Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -o <temporary folder> 2>&1 | Select-String "error|Erro"`
+Expected: no errors (`0 Error(s)`). Fix XAML/C# errors before moving on.
 
-- [ ] **Step 6: Verificação manual (usuário)**
+- [ ] **Step 6: Manual verification (user)**
 
-O usuário sai do app pela bandeja, o assistente recompila e abre o app. Em **Overlay**:
+The user exits the app through the tray, the assistant rebuilds and opens the app. In **Overlay**:
 
-1. O preview mostra o preset Default com valores de exemplo (144 FPS, 6.9 ms, …) e um mini-gráfico. Trocar o preset para Minimal e Full muda o preview e o overlay real (se ligado) na hora.
-2. Cada controle atualiza o preview: âncora, offsets, layout (Horizontal/Vertical/Compact), fonte (escolher da lista e digitar `Consolas` + Enter), tamanho, cor do rótulo/valor/fundo (picker), opacidade, raio, padding, gráfico (liga/desliga, largura, altura), taxa.
-3. Itens: subir/descer/remover mudam a ordem; "Add metric" lista só o que falta; o ícone de engrenagem abre o diálogo e uma cor `#FF0000` no valor pinta o valor de vermelho no preview; limiar 1 / 2 para CPU temp pinta o valor de laranja/vermelho (62 °C do exemplo passa dos dois).
-4. Qualquer alteração troca o seletor de preset para "Custom". "Save as…" com nome `Meu` cria o preset e o seleciona; nomes vazios ou `Default` mostram o erro no diálogo; "Delete" remove `Meu`.
-5. Ligar o overlay pelo interruptor da página reflete na bandeja (marca em "Show overlay") e vice-versa ao reabrir a página.
-6. Mudar o monitor, a âncora ou o tamanho com o overlay ligado move/redimensiona a janela real em tempo real.
-7. Reiniciar o app: o estilo, os presets do usuário e o estado ligado/desligado voltam como estavam.
+1. The preview shows the Default preset with sample values (144 FPS, 6.9 ms, …) and a mini-chart. Switching the preset to Minimal and Full changes the preview and the real overlay (if on) immediately.
+2. Each control updates the preview: anchor, offsets, layout (Horizontal/Vertical/Compact), font (pick from the list and type `Consolas` + Enter), size, label/value/background color (picker), opacity, radius, padding, chart (on/off, width, height), rate.
+3. Items: move up/down/remove change the order; "Add metric" lists only what is missing; the gear icon opens the dialog and a `#FF0000` color on the value paints the value red in the preview; threshold 1 / 2 for CPU temp paints the value orange/red (the example's 62 °C exceeds both).
+4. Any change switches the preset selector to "Custom". "Save as…" with the name `Mine` creates the preset and selects it; empty names or `Default` show the error in the dialog; "Delete" removes `Mine`.
+5. Turning on the overlay with the page switch is reflected in the tray (check mark on "Show overlay") and vice versa when the page is reopened.
+6. Changing the monitor, anchor or size with the overlay on moves/resizes the real window in real time.
+7. Restart the app: the style, user presets and on/off state come back as they were.
 
 - [ ] **Step 7: Commit**
 
@@ -5423,58 +5423,58 @@ git commit -m "feat(app): overlay editor page with live preview, item editor and
 
 ---
 
-### Task 10: Verificação de desempenho, FPS real e fechamento
+### Task 10: Performance check, real FPS and wrap-up
 
 **Files:**
 - Create: `docs/superpowers/plans/2026-10-10-supermonitor-03-results.md`
 
 **Interfaces:**
-- Consumes: app completo.
-- Produces: registro dos critérios 1–4 da spec (seção 1) com o overlay ativo, resultado dos testes e desvios do plano.
+- Consumes: complete app.
+- Produces: record of spec criteria 1–4 (section 1) with the overlay active, test results and deviations from the plan.
 
 - [ ] **Step 1: Testes**
 
 Run: `dotnet test --project tests/Supermonitor.Tests`
-Expected: todos passam; os testes ETW aparecem como ignorados neste shell sem elevação.
+Expected: all pass; the ETW tests show as skipped in this non-elevated shell.
 
-Pedir ao usuário que rode, em um PowerShell **como administrador**, `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Hardware.FrameCaptureSmokeTests"` e informe a saída. Os dois testes ETW devem passar e imprimir `present events received in 3 s: N` com N > 0.
+Ask the user to run, in a PowerShell **as administrator**, `dotnet test --project tests/Supermonitor.Tests --filter-class "Supermonitor.Tests.Hardware.FrameCaptureSmokeTests"` and report the output. Both ETW tests must pass and print `present events received in 3 s: N` with N > 0.
 
-- [ ] **Step 2: Verificação de FPS real (critério 4 da spec)**
+- [ ] **Step 2: Real FPS check (spec criterion 4)**
 
-Com o build Debug ou Release aberto como administrador e o overlay ligado:
+With the Debug or Release build open as administrator and the overlay on:
 
-1. Abrir um jogo em modo janela ou borderless (DX11 ou DX12). FPS, frametime e 1% low aparecem em até ~2 s e o mini-gráfico acompanha.
-2. Comparar com uma referência independente (contador de FPS do próprio jogo, do Steam ou Xbox Game Bar > Desempenho). Critério: diferença de até 2 FPS ou 3%, o maior dos dois.
-3. Alt-tab para a área de trabalho: FPS volta a `N/A` em ~2 s; ao voltar ao jogo, os números reaparecem.
-4. Mover o jogo entre monitores e trocar o monitor do overlay na página Overlay: o overlay segue o monitor escolhido.
-5. Jogo Vulkan ou OpenGL, se houver um à mão: mesmo comportamento (o evento DxgKrnl cobre todas as APIs).
+1. Open a game in windowed or borderless mode (DX11 or DX12). FPS, frametime and 1% low appear within ~2 s and the mini-chart follows.
+2. Compare with an independent reference (the game's own FPS counter, Steam's or Xbox Game Bar > Performance). Criterion: difference of up to 2 FPS or 3%, whichever is greater.
+3. Alt-tab to the desktop: FPS goes back to `N/A` in ~2 s; on returning to the game, the numbers reappear.
+4. Move the game between monitors and change the overlay's monitor on the Overlay page: the overlay follows the chosen monitor.
+5. Vulkan or OpenGL game, if one is at hand: same behavior (the DxgKrnl event covers all APIs).
 
-Se um jogo DX11/DX12 mostrar `N/A` ou o dobro do FPS real: **parar** e aplicar superpowers:systematic-debugging. A primeira hipótese é o evento DxgKrnl 184 não representar um present por frame para esse jogo; o fallback previsto nas Global Constraints é assinar também `Microsoft-Windows-DXGI` (GUID `ca11c036-0102-4a2d-a6ad-f03cfed5d3c9`, palavra-chave `0x1`, evento `42` = `Present_Start`) e, por processo, usar o DXGI quando ele aparecer. Registrar a decisão nos resultados.
+If a DX11/DX12 game shows `N/A` or double the real FPS: **stop** and apply superpowers:systematic-debugging. The first hypothesis is that DxgKrnl event 184 does not represent one present per frame for that game; the fallback foreseen in the Global Constraints is to also subscribe to `Microsoft-Windows-DXGI` (GUID `ca11c036-0102-4a2d-a6ad-f03cfed5d3c9`, keyword `0x1`, event `42` = `Present_Start`) and, per process, use DXGI when it appears. Record the decision in the results.
 
-- [ ] **Step 3: Recuperação após falha (item 6 da verificação manual da spec, parte ETW)**
+- [ ] **Step 3: Crash recovery (item 6 of the spec's manual verification, ETW part)**
 
-1. Com o overlay ligado e FPS em `N/A` ou com valores, encerrar o app à força: `taskkill /f /im Supermonitor.exe` (PowerShell como administrador).
-2. `logman query -ets` deve ainda listar `Supermonitor-FPS` (sessão órfã).
-3. Abrir o app de novo: o overlay volta ligado, o FPS funciona e `logman query -ets` lista **uma** sessão `Supermonitor-FPS`.
-4. Sair pelo menu "Exit": a sessão some.
+1. With the overlay on and FPS at `N/A` or with values, force-kill the app: `taskkill /f /im Supermonitor.exe` (PowerShell as administrator).
+2. `logman query -ets` should still list `Supermonitor-FPS` (orphan session).
+3. Open the app again: the overlay comes back on, FPS works and `logman query -ets` lists **one** `Supermonitor-FPS` session.
+4. Exit through the "Exit" menu: the session disappears.
 
-- [ ] **Step 4: Medir no build Release**
+- [ ] **Step 4: Measure on the Release build**
 
-1. `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; usuário sai do app pela bandeja e abre o exe de `bin\x64\Release\…\win-x64\` como administrador.
-2. Overlay ligado (preset Default) e Overview aberto, intervalo 1 s, 60 s: `pwsh -NoProfile tools/measure-cpu.ps1`. Critério: < 1%.
-3. Janela principal fechada (só bandeja + overlay), overlay ligado com o preset Default (FPS e mini-gráfico a 30 Hz), uma janela animando em primeiro plano, 60 s: `pwsh -NoProfile tools/measure-cpu.ps1`. Critério: < 0,3%.
-4. Mesmo cenário com o preset Minimal (4 Hz, sem gráfico), 60 s. Registrar (referência).
-5. Overlay desligado e janela fechada, 60 s. Critério: < 0,3% (prova que as leases e a sessão ETW foram liberadas: `logman query -ets` não lista `Supermonitor-FPS`).
+1. `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; the user exits the app through the tray and opens the exe from `bin\x64\Release\…\win-x64\` as administrator.
+2. Overlay on (Default preset) and Overview open, 1 s interval, 60 s: `pwsh -NoProfile tools/measure-cpu.ps1`. Criterion: < 1%.
+3. Main window closed (tray + overlay only), overlay on with the Default preset (FPS and mini-chart at 30 Hz), an animating window in the foreground, 60 s: `pwsh -NoProfile tools/measure-cpu.ps1`. Criterion: < 0.3%.
+4. Same scenario with the Minimal preset (4 Hz, no chart), 60 s. Record (reference).
+5. Overlay off and window closed, 60 s. Criterion: < 0.3% (proves the leases and the ETW session were released: `logman query -ets` does not list `Supermonitor-FPS`).
 
-Se um critério falhar, aplicar superpowers:systematic-debugging. Suspeitos, em ordem: (1) volume de eventos ETW (medido em 2026-10-10: ~6000 eventos/s e ~31 ms de CPU em 8 s só com a palavra-chave `Present`); (2) `FrameCaptureService.Current` chamado três vezes por tick do overlay, cada uma ordenando até ~2400 frametimes em `FrameTimeAggregator.GetStats` (cachear o `FrameStats` por `FrameVersion` e por 50 ms); (3) redesenho a 30 Hz com o mini-gráfico, recriando text layouts do DirectWrite a cada frame (cachear layouts por texto); (4) `MonitorCatalog.Enumerate` uma vez por segundo; (5) EcoQoS: o processo entra em modo de eficiência sem janela, o que pode atrasar a thread do overlay e a do ETW (opt-out por thread com `SetThreadInformation(ThreadPowerThrottling)` na thread `Overlay`).
+If a criterion fails, apply superpowers:systematic-debugging. Suspects, in order: (1) ETW event volume (measured on 2026-10-10: ~6000 events/s and ~31 ms of CPU in 8 s with only the `Present` keyword); (2) `FrameCaptureService.Current` called three times per overlay tick, each sorting up to ~2400 frametimes in `FrameTimeAggregator.GetStats` (cache the `FrameStats` by `FrameVersion` and by 50 ms); (3) redraw at 30 Hz with the mini-chart, recreating DirectWrite text layouts every frame (cache layouts by text); (4) `MonitorCatalog.Enumerate` once per second; (5) EcoQoS: the process enters efficiency mode with no window, which can delay the overlay thread and the ETW thread (per-thread opt-out with `SetThreadInformation(ThreadPowerThrottling)` on the `Overlay` thread).
 
-- [ ] **Step 5: Registrar resultados**
+- [ ] **Step 5: Record results**
 
-`docs/superpowers/plans/2026-10-10-supermonitor-03-results.md`: data, build, CPU e memória nos cenários do Step 4, contagem de testes, verificação de FPS real (jogo, referência, diferença), recuperação após falha, verificações manuais das Tasks 8 e 9 e desvios do plano com as decisões tomadas. Desvios já conhecidos para registrar:
-- A captura usa só o evento `Present` do DxgKrnl (a spec 3.4 também cita o DXGI); motivo e evidência nas Global Constraints.
-- Sem métricas de FPS na `MetricStore`: FPS, frametime e 1% low são lidos direto do `FrameCaptureService`, então não aparecem como cards do dashboard.
-- O item "estado do limitador" do overlay (spec 4.4) fica para o Plano 4, quando existir `IFrameLimiter`; o catálogo `OverlayMetric` ganha o membro lá.
-- O alvo do FPS é o processo em primeiro plano (qualquer app). A restrição a jogos detectados vem com o `GameDetector` do Plano 4.
+`docs/superpowers/plans/2026-10-10-supermonitor-03-results.md`: date, build, CPU and memory in the Step 4 scenarios, test count, real FPS check (game, reference, difference), crash recovery, manual checks of Tasks 8 and 9 and deviations from the plan with the decisions taken. Already-known deviations to record:
+- Capture uses only the DxgKrnl `Present` event (spec 3.4 also mentions DXGI); reason and evidence in the Global Constraints.
+- No FPS metrics in the `MetricStore`: FPS, frametime and 1% low are read directly from `FrameCaptureService`, so they do not appear as dashboard cards.
+- The overlay's "limiter state" item (spec 4.4) is left for Plan 4, when `IFrameLimiter` exists; the `OverlayMetric` catalog gains the member there.
+- The FPS target is the foreground process (any app). Restriction to detected games comes with Plan 4's `GameDetector`.
 
 - [ ] **Step 6: Commit**
 
@@ -5487,15 +5487,15 @@ git commit -m "docs: record FPS capture and overlay plan results"
 
 ## Self-Review
 
-**Cobertura da spec (3.4, 3.5, 4.4):**
-- 3.4 sessão ETW nomeada `Supermonitor-FPS`, órfã parada ao iniciar → Task 5 (`EtwPresentSource`, teste de sessão órfã). Alvo = processo em primeiro plano, frametime = intervalo entre presents → Tasks 4 e 1. `FrameTimeAggregator` com FPS médio da janela, frametime atual e buffer de frametimes para o mini-gráfico e o benchmark → Task 1 (`CopyFrameTimes`, `Percentile` reutilizável). DXGI como complemento → desvio registrado (Global Constraints, Task 10).
-- 3.5 estilos `WS_EX_LAYERED | TRANSPARENT | TOPMOST | NOACTIVATE | TOOLWINDOW` → Task 7 (`OverlayWindow`). Direct2D num DIB 32 bits premultiplicado + `UpdateLayeredWindow`, DirectWrite em tons de cinza → Task 6/7. Redesenho só quando um valor muda, 4 Hz padrão, gráfico até 30 Hz → Tasks 3 (`SameContentAs`, `OverlayRefresh`) e 7 (`Tick`).
-- 4.4 monitor e 9 âncoras + deslocamento → Tasks 3 (`OverlayPlacement`) e 7 (`MonitorCatalog`) e 9; métricas e ordem → Tasks 2/3/9 (limitador: Plano 4); layout horizontal/vertical/compacto → Task 6; fonte, tamanho, cores por métrica, limiares → Tasks 2/3/9; fundo (cor, opacidade, raio, padding) → Tasks 2/6/9; mini-gráfico liga/desliga, largura, altura → Tasks 2/6/9; taxa de atualização → Tasks 2/9; presets Minimal/Default/Full e do usuário → Task 2; preview ao vivo com o mesmo renderizador → Task 9.
-- Critérios de sucesso 2 (só bandeja + overlay < 0,3%) e 4 (FPS real) → Task 10.
-- Estados de erro da spec 7: falha ao criar sessão ETW → FPS "N/A", motivo na UI, retry a cada 30 s → Task 4 (`Failed`/`RetryInterval`), Task 9 (`CaptureBar`).
+**Spec coverage (3.4, 3.5, 4.4):**
+- 3.4 ETW session named `Supermonitor-FPS`, orphan stopped on startup → Task 5 (`EtwPresentSource`, orphan session test). Target = foreground process, frametime = interval between presents → Tasks 4 and 1. `FrameTimeAggregator` with the window's average FPS, current frametime and frametime buffer for the mini-chart and the benchmark → Task 1 (`CopyFrameTimes`, reusable `Percentile`). DXGI as a complement → recorded deviation (Global Constraints, Task 10).
+- 3.5 styles `WS_EX_LAYERED | TRANSPARENT | TOPMOST | NOACTIVATE | TOOLWINDOW` → Task 7 (`OverlayWindow`). Direct2D into a premultiplied 32-bit DIB + `UpdateLayeredWindow`, grayscale DirectWrite → Tasks 6/7. Redraw only when a value changes, 4 Hz default, chart up to 30 Hz → Tasks 3 (`SameContentAs`, `OverlayRefresh`) and 7 (`Tick`).
+- 4.4 monitor and 9 anchors + offset → Tasks 3 (`OverlayPlacement`) and 7 (`MonitorCatalog`) and 9; metrics and order → Tasks 2/3/9 (limiter: Plan 4); horizontal/vertical/compact layout → Task 6; font, size, per-metric colors, thresholds → Tasks 2/3/9; background (color, opacity, radius, padding) → Tasks 2/6/9; mini-chart on/off, width, height → Tasks 2/6/9; update rate → Tasks 2/9; Minimal/Default/Full and user presets → Task 2; live preview with the same renderer → Task 9.
+- Success criteria 2 (tray + overlay only < 0.3%) and 4 (real FPS) → Task 10.
+- Spec 7 error states: failure creating ETW session → FPS "N/A", reason in the UI, retry every 30 s → Task 4 (`Failed`/`RetryInterval`), Task 9 (`CaptureBar`).
 
-**Placeholders:** nenhum "TBD"/"TODO"; os trechos condicionais (assinaturas do Vortice, `AsStream`) trazem a alternativa concreta.
+**Placeholders:** no "TBD"/"TODO"; the conditional passages (Vortice signatures, `AsStream`) carry the concrete alternative.
 
-**Consistência de tipos:** `FrameStats`/`FrameTimeAggregator` (Task 1) → `FrameCaptureService.Current/CopyFrameTimes/FrameVersion` (Task 4) → `LiveOverlayValues` (Task 7); `OverlayStyle/OverlayItemSettings` (Task 2) → `OverlayFrameBuilder` (Task 3) → `OverlayRenderer` (Task 6) → `OverlayService` (Task 7) e `OverlayPage` (Task 9); `Demand.FrameCapture` (Task 3) → `DemandTracker.Changed` (Task 4) → `OverlayService` (Task 7); `PixelRect` (Task 3) → `MonitorInfo.Bounds` (Task 7); `OverlayService.Changed/SetEnabled/Apply/Enabled` (Task 7) → `App` (Task 8) → `OverlayPage` (Task 9).
+**Type consistency:** `FrameStats`/`FrameTimeAggregator` (Task 1) → `FrameCaptureService.Current/CopyFrameTimes/FrameVersion` (Task 4) → `LiveOverlayValues` (Task 7); `OverlayStyle/OverlayItemSettings` (Task 2) → `OverlayFrameBuilder` (Task 3) → `OverlayRenderer` (Task 6) → `OverlayService` (Task 7) and `OverlayPage` (Task 9); `Demand.FrameCapture` (Task 3) → `DemandTracker.Changed` (Task 4) → `OverlayService` (Task 7); `PixelRect` (Task 3) → `MonitorInfo.Bounds` (Task 7); `OverlayService.Changed/SetEnabled/Apply/Enabled` (Task 7) → `App` (Task 8) → `OverlayPage` (Task 9).
 
-**Review Focus:** (1) Task 4; (2) Tasks 4 e 5; (3) Task 1; (4) Task 2; (5) Task 3 (`OverlayPlacement`) e Task 7 (`MonitorCatalog.Resolve`).
+**Review Focus:** (1) Task 4; (2) Tasks 4 and 5; (3) Task 1; (4) Task 2; (5) Task 3 (`OverlayPlacement`) and Task 7 (`MonitorCatalog.Resolve`).

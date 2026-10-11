@@ -5,16 +5,16 @@ namespace Supermonitor.Core.Frames;
 
 public interface IPresentSource : IDisposable
 {
-    // processId do app que apresentou e instante em ms (monotônico).
+    // processId of the presenting app and timestamp in ms (monotonic).
     event Action<int, double>? Presented;
 
-    // Lança se a captura não puder começar.
+    // Throws if capture cannot start.
     void Start();
 }
 
 public interface IForegroundProbe
 {
-    // 0 quando não há janela em primeiro plano.
+    // 0 when there is no foreground window.
     int GetForegroundProcessId();
 }
 
@@ -25,8 +25,8 @@ public enum FrameCaptureState
     Failed,
 }
 
-// Liga a fonte de presents só enquanto existe uma lease Demand.FrameCapture, segue o processo em primeiro plano
-// e alimenta o FrameTimeAggregator. Falhas ao iniciar são reportadas e tentadas de novo a cada 30 s.
+// Runs the present source only while a Demand.FrameCapture lease exists, follows the foreground process
+// and feeds the FrameTimeAggregator. Start failures are reported and retried every 30 s.
 public sealed class FrameCaptureService : IDisposable
 {
     public static readonly TimeSpan IdleAfter = TimeSpan.FromSeconds(2);
@@ -69,7 +69,7 @@ public sealed class FrameCaptureService : IDisposable
 
     public long FrameVersion => _aggregator.Version;
 
-    // Sem presents há mais de IdleAfter (jogo parou, alt-tab) volta a "sem dados".
+    // No presents for over IdleAfter (game stopped, alt-tab) returns to "no data".
     public FrameStats Current
     {
         get
@@ -181,7 +181,7 @@ public sealed class FrameCaptureService : IDisposable
         Volatile.Write(ref _target, pid);
     }
 
-    // Thread do ETW.
+    // ETW thread.
     private void OnPresented(int pid, double timestampMs)
     {
         if (pid == 0 || pid != Volatile.Read(ref _target))
@@ -234,7 +234,7 @@ public sealed class FrameCaptureService : IDisposable
         finally
         {
             Volatile.Write(ref _loopActive, 0);
-            // A demanda pode ter voltado entre a última checagem e o fim do laço. Após uma exceção não reinicia, para não girar em falso.
+            // Demand may have returned between the last check and loop end. After an exception, do not restart, to avoid spinning.
             if (completed && !_cts.IsCancellationRequested && _demand.IsActive(Demand.FrameCapture))
             {
                 EnsureLoop();

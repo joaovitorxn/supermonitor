@@ -11,7 +11,7 @@ public sealed class DemandTracker
 {
     private readonly int[] _counts = new int[Enum.GetValues<Demand>().Length];
 
-    // Disparado na thread de quem adquire/libera, quando a contagem de um Demand passa de 0 para 1 ou de 1 para 0.
+    // Raised on the acquiring/releasing thread when a Demand count goes 0 to 1 or 1 to 0.
     public event Action<Demand, bool>? Changed;
 
     public IDisposable Acquire(Demand demand)

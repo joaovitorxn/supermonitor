@@ -4,7 +4,7 @@ using Supermonitor.Core.Diagnostics;
 
 namespace Supermonitor.Core.Frames;
 
-// Um evento por present (DxgKrnl, id 184) de qualquer processo; o ProcessID do cabeçalho é o do app que apresenta.
+// One event per present (DxgKrnl, id 184) from any process; the header ProcessID is the presenting app's.
 public sealed class EtwPresentSource : IPresentSource
 {
     public const string SessionName = "Supermonitor-FPS";
@@ -25,7 +25,7 @@ public sealed class EtwPresentSource : IPresentSource
             throw new UnauthorizedAccessException("FPS capture needs administrator rights.");
         }
 
-        // O construtor padrão (Create) para e recria uma sessão órfã com o mesmo nome, deixada por um crash anterior.
+        // The default constructor (Create) stops and recreates an orphan session of the same name left by an earlier crash.
         var session = new TraceEventSession(SessionName);
         try
         {
@@ -60,7 +60,7 @@ public sealed class EtwPresentSource : IPresentSource
             return;
         }
 
-        // Parar a sessão faz Process() retornar.
+        // Stopping the session makes Process() return.
         session.Dispose();
         try
         {

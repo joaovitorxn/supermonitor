@@ -4,8 +4,8 @@ using Supermonitor.Overlay.Interop;
 
 namespace Supermonitor.Overlay;
 
-// Janela Win32 layered, click-through, sempre no topo, sem foco e fora do Alt+Tab.
-// Precisa ser criada e usada na thread que roda o laço de mensagens.
+// Layered Win32 window: click-through, always on top, unfocusable and hidden from Alt+Tab.
+// Must be created and used on the thread that runs the message loop.
 internal sealed unsafe class OverlayWindow : IDisposable
 {
     private const string ClassName = "Supermonitor.Overlay";
@@ -44,7 +44,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
 
     public nint Handle { get; private set; }
 
-    // Troca o conteúdo e a posição de uma vez; o DIB já vem premultiplicado.
+    // Swaps content and position at once; the DIB is already premultiplied.
     public void Present(OverlayBitmap bitmap, int x, int y)
     {
         var position = new User32.POINT { X = x, Y = y };
@@ -61,7 +61,7 @@ internal sealed unsafe class OverlayWindow : IDisposable
 
     public void Hide() => User32.ShowWindow(Handle, User32.SW_HIDE);
 
-    // Jogos borderless também são topmost; reafirmar a ordem de tempos em tempos mantém o overlay por cima.
+    // Borderless games are also topmost; reasserting the order periodically keeps the overlay on top.
     public void KeepOnTop() =>
         User32.SetWindowPos(Handle, User32.HWND_TOPMOST, 0, 0, 0, 0, User32.SWP_NOMOVE | User32.SWP_NOSIZE | User32.SWP_NOACTIVATE);
 

@@ -156,7 +156,7 @@ public sealed partial class MetricCard : UserControl
         }
     }
 
-    // Arrastar do sistema (OLE) não funciona em processo elevado; reordenação feita com captura de ponteiro.
+    // System drag (OLE) does not work in an elevated process; reordering uses pointer capture.
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         var mouseWithoutLeftButton = e.Pointer.PointerDeviceType == PointerDeviceType.Mouse
@@ -179,7 +179,7 @@ public sealed partial class MetricCard : UserControl
         }
     }
 
-    // O card segue o ponteiro; os demais só se reorganizam ao soltar.
+    // The card follows the pointer; the others rearrange only on drop.
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (!_reordering)
@@ -217,7 +217,7 @@ public sealed partial class MetricCard : UserControl
         visual.Properties.InsertVector3("Translation", System.Numerics.Vector3.Zero);
         if (target?.ViewModel is { } targetVm)
         {
-            // O card reordenado nasce na posição onde foi solto e desliza até o novo lugar.
+            // The reordered card starts at its drop position and slides to its new place.
             if ((VisualTreeHelper.GetParent(this) as ItemsRepeater)?.Layout is CardWrapLayout layout)
             {
                 layout.Nudge(vm.MetricId, _dragOffset.X, _dragOffset.Y);

@@ -8,7 +8,7 @@ public static class OverlayPresets
 
     public static IReadOnlyList<string> BuiltInNames { get; } = [MinimalName, DefaultName, FullName];
 
-    // Só FPS, numa linha.
+    // FPS only, on one line.
     public static OverlayStyle Minimal() => new()
     {
         Layout = OverlayLayout.Compact,

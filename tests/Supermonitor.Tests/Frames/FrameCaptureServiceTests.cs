@@ -68,7 +68,7 @@ public class FrameCaptureServiceTests
 
         public void Plan(Func<FakeSource> source) => _plans.Enqueue(source);
 
-        // Entrega `count` frames de 10 ms do processo (count + 1 presents), começando em `start`; devolve o último instante.
+        // Delivers `count` 10 ms frames for the process (count + 1 presents), starting at `start`; returns the last instant.
         public double Feed(int pid, double start, int count)
         {
             var timestamp = start;

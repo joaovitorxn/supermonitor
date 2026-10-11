@@ -16,7 +16,7 @@ public static class HardwareSensorMapper
         _ => null,
     };
 
-    // Carga, memória e tráfego já vêm de PDH/Win32; aqui só o que o Windows não expõe.
+    // Load, memory and traffic already come from PDH/Win32; only what Windows doesn't expose is here.
     public static MetricUnit? UnitOf(SensorType type) => type switch
     {
         SensorType.Temperature => MetricUnit.Celsius,
@@ -57,7 +57,7 @@ public static class HardwareSensorMapper
 
 public static class GpuIndexMatcher
 {
-    // Alinha a GPU do LHM com o índice DXGI usado pelo GpuProvider (gpu{n}).
+    // Aligns the LHM GPU with the DXGI index used by GpuProvider (gpu{n}).
     public static int Match(IReadOnlyList<string> adapterNames, string name, ICollection<int> used)
     {
         for (var i = 0; i < adapterNames.Count; i++)

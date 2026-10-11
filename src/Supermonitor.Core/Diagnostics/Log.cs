@@ -18,7 +18,7 @@ public static class Log
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Arquivo antigo bloqueado ou somente leitura: fica para a próxima limpeza.
+                // Old file locked or read-only: left for the next cleanup.
             }
         }
     }

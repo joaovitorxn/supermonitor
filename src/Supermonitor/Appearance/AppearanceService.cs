@@ -44,7 +44,7 @@ public static class AppearanceService
             _ => TitleBarTheme.UseDefaultAppMode,
         };
 
-        // Trocar o backdrop durante uma transição de tema derruba o CoreMessaging; só troca quando o tipo muda.
+        // Swapping the backdrop during a theme transition crashes CoreMessaging; only swap when the type changes.
         if (KindOf(window.SystemBackdrop) != settings.Backdrop)
         {
             window.SystemBackdrop = settings.Backdrop switch
@@ -59,7 +59,7 @@ public static class AppearanceService
         ApplySolidBackground(root, settings);
         if (ApplyAccentResources(settings.AccentColor))
         {
-            // ThemeResource só é reavaliado numa troca de tema: alterna e volta para os controles pegarem a nova cor.
+            // ThemeResource is only re-evaluated on a theme change: toggle and revert so controls pick up the new color.
             var requested = root.RequestedTheme;
             root.RequestedTheme = root.ActualTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
             root.RequestedTheme = requested;
@@ -68,7 +68,7 @@ public static class AppearanceService
         AccentPalette.Set(ResolveAccent(settings.AccentColor));
     }
 
-    // Sobrescreve as cores de destaque do WinUI no nível do app; null volta para a cor do Windows.
+    // Overrides the WinUI accent colors at app level; null restores the Windows color.
     public static bool ApplyAccentResources(string? hex)
     {
         if (_accentApplied && _appliedAccent == hex)
@@ -100,7 +100,7 @@ public static class AppearanceService
         return !firstTime;
     }
 
-    // Único ajuste que depende do tema efetivo; seguro para chamar de ActualThemeChanged.
+    // Only adjustment that depends on the effective theme; safe to call from ActualThemeChanged.
     public static void ApplySolidBackground(Panel root, AppSettings settings)
     {
         if (settings.Backdrop == BackdropKind.Solid)

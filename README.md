@@ -2,7 +2,7 @@
 
 A performance monitor and in-game overlay for Windows 11, built for gamers. One WinUI 3 process lives in the tray, samples your hardware at very low cost, and can draw a click-through overlay with FPS, frametime and system metrics over windowed and borderless games.
 
-> Status: **0.1.0 preview.** The FPS limiter, Game Mode, benchmarks, global hotkeys and standby-list cleaner are planned for 0.2.
+> Status: **0.1.1 preview.** The FPS limiter, Game Mode, benchmarks, global hotkeys and standby-list cleaner are planned for 0.2.
 
 ## Features
 
@@ -22,7 +22,7 @@ A performance monitor and in-game overlay for Windows 11, built for gamers. One 
 
 ## Install
 
-1. Download `Supermonitor-0.1.0-win-x64.zip` from the [latest release](https://github.com/joaovitorxn/supermonitor/releases/latest).
+1. Download `Supermonitor-0.1.1-win-x64.zip` from the [latest release](https://github.com/joaovitorxn/supermonitor/releases/latest).
 2. Extract it anywhere and run `Supermonitor.exe`. Approve the UAC prompt.
 3. Closing the window keeps the app in the tray. Right-click the tray icon to open the dashboard, toggle the overlay or exit.
 

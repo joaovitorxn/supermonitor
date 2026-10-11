@@ -18,7 +18,7 @@ public static class ThresholdEvaluator
             return ThresholdLevel.Normal;
         }
 
-        // Com lowerIsWorse, Warning >= Critical e o valor cai até cruzá-los.
+        // With lowerIsWorse, Warning >= Critical and the value falls until it crosses them.
         if (lowerIsWorse)
         {
             if (value <= threshold.Critical)

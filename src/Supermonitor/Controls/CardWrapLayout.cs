@@ -6,12 +6,12 @@ using Windows.Foundation;
 
 namespace Supermonitor.Controls;
 
-// Fluxo da esquerda para a direita; quebra de linha quando o próximo card não cabe.
+// Flows left to right; wraps to a new line when the next card does not fit.
 public sealed partial class CardWrapLayout : NonVirtualizingLayout
 {
     public double Spacing { get; set; } = 12;
 
-    // Última posição por card; o elemento é recriado no reordenamento, então a chave é o MetricId.
+    // Last position per card; the element is recreated on reorder, so the key is the MetricId.
     private readonly Dictionary<string, Point> _lastPositions = [];
     private string[] _lastOrder = [];
 
@@ -26,7 +26,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
         double x = 0, y = 0, rowHeight = 0, usedWidth = 0;
         var ordered = InItemOrder(context.Children).ToArray();
         var order = arrange ? ordered.Select(IdOf).ToArray() : _lastOrder;
-        // Só anima quando a ordem muda (reordenação); redimensionar a janela reposiciona sem deslizar.
+        // Animates only when the order changes (reorder); resizing the window repositions without sliding.
         var animate = arrange && !order.SequenceEqual(_lastOrder);
         foreach (var child in ordered)
         {
@@ -56,7 +56,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
 
         if (arrange)
         {
-            // Cards removidos saem do dicionário; reordenar mantém o conjunto de ids e preserva as posições.
+            // Removed cards leave the dictionary; reordering keeps the id set and preserves positions.
             if (order.Length != _lastOrder.Length)
             {
                 var present = order.ToHashSet();
@@ -72,7 +72,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
         return new Size(double.IsInfinity(width) ? usedWidth : width, y + rowHeight);
     }
 
-    // Faz a próxima animação do card partir de onde ele foi solto, não do seu lugar de origem.
+    // Makes the card's next animation start where it was dropped, not from its origin.
     public bool Nudge(string metricId, float dx, float dy)
     {
         if (!_lastPositions.TryGetValue(metricId, out var p))
@@ -108,7 +108,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
         _lastPositions[vm.MetricId] = position;
     }
 
-    // Children segue a ordem de criação dos elementos; depois de ObservableCollection.Move só o índice do item muda.
+    // Children follows element creation order; after ObservableCollection.Move only the item's index changes.
     private static IEnumerable<UIElement> InItemOrder(IReadOnlyList<UIElement> children)
     {
         if (children.Count == 0 || VisualTreeHelper.GetParent(children[0]) is not ItemsRepeater repeater)

@@ -16,6 +16,16 @@
                     <DataTemplate x:DataType="vm:MetricGroupViewModel">
                         <StackPanel Spacing="8">
                             <TextBlock Text="{x:Bind Name}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <ItemsRepeater ItemsSource="{x:Bind Summary}">
+                                <ItemsRepeater.Layout>
+                                    <controls:CardWrapLayout Spacing="12" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:InfoCardViewModel">
+                                        <controls:InfoCard ViewModel="{x:Bind}" />
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
                             <ItemsRepeater ItemsSource="{x:Bind Items}">
                                 <ItemsRepeater.Layout>
                                     <controls:CardWrapLayout Spacing="12" />
