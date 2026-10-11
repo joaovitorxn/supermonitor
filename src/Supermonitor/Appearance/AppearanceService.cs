@@ -10,6 +10,20 @@ namespace Supermonitor.Appearance;
 
 public static class AppearanceService
 {
+    private static readonly string[] AccentKeys =
+    [
+        "SystemAccentColor",
+        "SystemAccentColorLight1",
+        "SystemAccentColorLight2",
+        "SystemAccentColorLight3",
+        "SystemAccentColorDark1",
+        "SystemAccentColorDark2",
+        "SystemAccentColorDark3",
+    ];
+
+    private static string? _appliedAccent;
+    private static bool _accentApplied;
+
     public static event Action? Changed;
 
     public static void NotifyChanged() => Changed?.Invoke();
@@ -43,7 +57,47 @@ public static class AppearanceService
         }
 
         ApplySolidBackground(root, settings);
+        if (ApplyAccentResources(settings.AccentColor))
+        {
+            // ThemeResource só é reavaliado numa troca de tema: alterna e volta para os controles pegarem a nova cor.
+            var requested = root.RequestedTheme;
+            root.RequestedTheme = root.ActualTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+            root.RequestedTheme = requested;
+        }
+
         AccentPalette.Set(ResolveAccent(settings.AccentColor));
+    }
+
+    // Sobrescreve as cores de destaque do WinUI no nível do app; null volta para a cor do Windows.
+    public static bool ApplyAccentResources(string? hex)
+    {
+        if (_accentApplied && _appliedAccent == hex)
+        {
+            return false;
+        }
+
+        var firstTime = !_accentApplied;
+        _accentApplied = true;
+        _appliedAccent = hex;
+        var resources = Application.Current.Resources;
+        if (!ColorText.TryParseRgb(hex, out var r, out var g, out var b))
+        {
+            foreach (var key in AccentKeys)
+            {
+                resources.Remove(key);
+            }
+
+            return !firstTime;
+        }
+
+        var shades = AccentShades.Compute(r, g, b);
+        (byte R, byte G, byte B)[] values = [shades.Base, shades.Light1, shades.Light2, shades.Light3, shades.Dark1, shades.Dark2, shades.Dark3];
+        for (var i = 0; i < AccentKeys.Length; i++)
+        {
+            resources[AccentKeys[i]] = Color.FromArgb(255, values[i].R, values[i].G, values[i].B);
+        }
+
+        return !firstTime;
     }
 
     // Único ajuste que depende do tema efetivo; seguro para chamar de ActualThemeChanged.

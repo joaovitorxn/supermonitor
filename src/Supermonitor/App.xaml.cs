@@ -65,6 +65,7 @@ public partial class App : Application
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _host = AppHost.Create();
         _host.Start();
+        Appearance.AppearanceService.ApplyAccentResources(_host.Settings.Current.AccentColor);
 
         _tray = new TrayIcon(
             "Supermonitor",

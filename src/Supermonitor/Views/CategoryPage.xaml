@@ -6,7 +6,7 @@
     xmlns:vm="using:Supermonitor.ViewModels">
     <ScrollViewer Padding="24">
         <StackPanel Spacing="20">
-            <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock Text="{x:Bind ViewModel.Title}" Style="{StaticResource TitleTextBlockStyle}" />
             <controls:MemoryCompositionBar x:Name="MemoryBar" Visibility="Collapsed" />
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
                 <ItemsRepeater.Layout>
