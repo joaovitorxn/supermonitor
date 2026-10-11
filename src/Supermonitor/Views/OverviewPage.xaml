@@ -9,12 +9,7 @@
             <TextBlock Text="Overview" Style="{StaticResource TitleTextBlockStyle}" />
             <ItemsRepeater ItemsSource="{x:Bind ViewModel.Cards, Mode=OneWay}">
                 <ItemsRepeater.Layout>
-                    <UniformGridLayout
-                        MinItemWidth="280"
-                        MinItemHeight="160"
-                        MinColumnSpacing="12"
-                        MinRowSpacing="12"
-                        ItemsStretch="Fill" />
+                    <controls:CardWrapLayout Spacing="12" />
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate x:DataType="vm:MetricCardViewModel">

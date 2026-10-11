@@ -56,11 +56,13 @@ public sealed class OverviewViewModel : IDisposable
             return;
         }
 
-        var points = Math.Max(2, 60_000 / _host.Settings.Current.SampleIntervalMs);
+        var settings = _host.Settings.Current;
+        var points = Math.Max(2, 60_000 / settings.SampleIntervalMs);
+        var options = settings.ToUnitOptions();
         foreach (var card in Cards)
         {
             card.PointCount = points;
-            card.Refresh(UnitOptions.Default);
+            card.Refresh(options, settings.Thresholds.GetValueOrDefault(card.MetricId));
         }
     }
 }
