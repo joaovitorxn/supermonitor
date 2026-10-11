@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Supermonitor.Core/Supermonitor.Core.csproj" />
+    <Project Path="src/Supermonitor/Supermonitor.csproj">
+      <Platform Project="x64" />
+    </Project>
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Supermonitor.Tests/Supermonitor.Tests.csproj" />
