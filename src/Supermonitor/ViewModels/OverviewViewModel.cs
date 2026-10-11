@@ -90,9 +90,17 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
         var to = DashboardEditor.MoveBy(Settings.Cards, card.MetricId, delta);
         if (from >= 0 && to >= 0 && from != to)
         {
-            Cards.Move(from, to);
+            MoveCard(from, to);
             Save();
         }
+    }
+
+    // ItemsRepeater não reorganiza o layout após ObservableCollection.Move; Remove+Insert força o re-layout.
+    private void MoveCard(int from, int to)
+    {
+        var card = Cards[from];
+        Cards.RemoveAt(from);
+        Cards.Insert(to, card);
     }
 
     public void MoveTo(string metricId, string targetMetricId)
@@ -105,10 +113,9 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
         }
 
         var to = DashboardEditor.MoveTo(Settings.Cards, metricId, target);
-        Supermonitor.Core.Diagnostics.Log.Info($"DIAG MoveTo {metricId} from {from} to {to} (target {targetMetricId})");
         if (to != from)
         {
-            Cards.Move(from, to);
+            MoveCard(from, to);
             Save();
         }
     }
