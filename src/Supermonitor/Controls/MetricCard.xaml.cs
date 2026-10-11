@@ -1,12 +1,13 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Supermonitor.Core.Dashboard;
 using Supermonitor.Core.Settings;
 using Supermonitor.Dialogs;
 using Supermonitor.ViewModels;
-using Windows.ApplicationModel.DataTransfer;
 
 namespace Supermonitor.Controls;
 
@@ -21,10 +22,12 @@ public sealed partial class MetricCard : UserControl
     public MetricCard()
     {
         InitializeComponent();
-        DragStarting += OnDragStarting;
-        DragOver += OnDragOver;
-        Drop += OnDrop;
+        CardBorder.PointerPressed += OnPointerPressed;
+        CardBorder.PointerReleased += OnPointerReleased;
+        CardBorder.PointerCaptureLost += (_, _) => EndReorder();
     }
+
+    private bool _reordering;
 
     public MetricCardViewModel? ViewModel
     {
@@ -64,8 +67,6 @@ public sealed partial class MetricCard : UserControl
         var vm = ViewModel;
         Chart.Kind = vm?.Chart ?? ChartKind.Line;
         var editing = vm is { IsEditing: true, Actions: not null };
-        CanDrag = editing;
-        AllowDrop = editing;
         RemoveButton.Visibility = editing ? Visibility.Visible : Visibility.Collapsed;
 
         switch (vm?.Level ?? ThresholdLevel.Normal)
@@ -151,34 +152,53 @@ public sealed partial class MetricCard : UserControl
         }
     }
 
-    private void OnDragStarting(UIElement sender, DragStartingEventArgs args)
+    // Arrastar do sistema (OLE) não funciona em processo elevado; reordenação feita com captura de ponteiro.
+    private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (ViewModel is { } vm)
-        {
-            args.Data.SetText(vm.MetricId);
-            args.Data.RequestedOperation = DataPackageOperation.Move;
-        }
-    }
-
-    private void OnDragOver(object sender, DragEventArgs e)
-    {
-        if (e.DataView.Contains(StandardDataFormats.Text))
-        {
-            e.AcceptedOperation = DataPackageOperation.Move;
-        }
-    }
-
-    private async void OnDrop(object sender, DragEventArgs e)
-    {
-        if (ViewModel is not { Actions: { } actions } vm || !e.DataView.Contains(StandardDataFormats.Text))
+        var mouseWithoutLeftButton = e.Pointer.PointerDeviceType == PointerDeviceType.Mouse
+            && !e.GetCurrentPoint(CardBorder).Properties.IsLeftButtonPressed;
+        if (ViewModel is not { IsEditing: true, Actions: not null } || mouseWithoutLeftButton)
         {
             return;
         }
 
-        var source = await e.DataView.GetTextAsync();
-        if (source != vm.MetricId)
+        _reordering = CardBorder.CapturePointer(e.Pointer);
+        if (_reordering)
         {
-            actions.MoveTo(source, vm.MetricId);
+            Opacity = 0.6;
+            e.Handled = true;
         }
+    }
+
+    private void OnPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_reordering)
+        {
+            return;
+        }
+
+        var position = e.GetCurrentPoint(null).Position;
+        CardBorder.ReleasePointerCapture(e.Pointer);
+        EndReorder();
+        e.Handled = true;
+
+        if (ViewModel is not { Actions: { } actions } vm || XamlRoot?.Content is not UIElement root)
+        {
+            return;
+        }
+
+        var target = VisualTreeHelper.FindElementsInHostCoordinates(position, root)
+            .OfType<MetricCard>()
+            .FirstOrDefault(card => !ReferenceEquals(card, this) && card.ViewModel is not null);
+        if (target?.ViewModel is { } targetVm)
+        {
+            actions.MoveTo(vm.MetricId, targetVm.MetricId);
+        }
+    }
+
+    private void EndReorder()
+    {
+        _reordering = false;
+        Opacity = 1;
     }
 }
