@@ -159,6 +159,9 @@ public sealed partial class MainWindow : Window
             case "network":
                 ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Network, "Network"));
                 break;
+            case "processes":
+                ContentFrame.Navigate(typeof(ProcessesPage), context);
+                break;
             case "settings":
                 ContentFrame.Navigate(typeof(SettingsPage), context);
                 break;
