@@ -1,8 +1,10 @@
+using Supermonitor.Core;
 using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
 using Supermonitor.Core.Sensors.Disk;
 using Supermonitor.Core.Sensors.Gpu;
+using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
 
@@ -92,6 +94,17 @@ public class ProviderSmokeTests
         Assert.True(store.GetLatest(MetricIds.GpuVramTotal(0)) > 0);
         Assert.True(store.GetLatest(MetricIds.GpuVramUsed(0)) > 0);
         Assert.True(store.TryGetDescriptor(MetricIds.GpuUsage(0), out var descriptor));
+        Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
+    }
+
+    [Fact]
+    public void Hardware_provider_reports_gpu_temperature()
+    {
+        using var provider = new HardwareProvider(AppHost.MonitoredGpuNames);
+        var store = SampleTwice(provider);
+
+        Assert.InRange(store.GetLatest(MetricIds.GpuTemperature(0)), 1, 120);
+        Assert.True(store.TryGetDescriptor(MetricIds.GpuTemperature(0), out var descriptor));
         Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
     }
 }

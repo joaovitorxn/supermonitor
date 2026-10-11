@@ -4,6 +4,7 @@ using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
 using Supermonitor.Core.Sensors.Disk;
 using Supermonitor.Core.Sensors.Gpu;
+using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
 using Supermonitor.Core.Settings;
@@ -17,8 +18,9 @@ public sealed class AppHost : IAsyncDisposable
 
     private readonly PingMonitor _ping;
 
-    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping)
+    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping, DemandTracker demand)
     {
+        Demand = demand;
         Settings = settings;
         SettingsLoadResult = loadResult;
         Metrics = metrics;
@@ -34,6 +36,14 @@ public sealed class AppHost : IAsyncDisposable
 
     public SensorHub Hub { get; }
 
+    public DemandTracker Demand { get; }
+
+    public static IReadOnlyList<string> MonitoredGpuNames() =>
+        DxgiAdapters.Enumerate()
+            .Where(a => GpuAdapterFilter.IsMonitored(a.Flags, a.DedicatedVideoMemory))
+            .Select(a => a.Name)
+            .ToArray();
+
     public static AppHost Create()
     {
         Log.Initialize(AppPaths.LogDirectory);
@@ -47,19 +57,21 @@ public sealed class AppHost : IAsyncDisposable
         var loadResult = settings.Load();
 
         var metrics = new MetricStore(HistoryCapacity);
+        var demand = new DemandTracker();
         var ping = new PingMonitor(() => settings.Current.PingHost, TimeSpan.FromSeconds(2));
         ISensorProvider[] providers =
         [
             new CpuProvider(),
             new MemoryProvider(),
             new GpuProvider(),
+            new HardwareProvider(MonitoredGpuNames),
             new DiskProvider(),
             new DriveSpaceProvider(),
             new NetworkProvider(),
             new PingProvider(ping),
         ];
-        var hub = new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs));
-        return new AppHost(settings, loadResult, metrics, hub, ping);
+        var hub = new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs), demand);
+        return new AppHost(settings, loadResult, metrics, hub, ping, demand);
     }
 
     public void Start()

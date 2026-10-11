@@ -2,6 +2,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Supermonitor.Core;
+using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
 using Supermonitor.ViewModels;
@@ -14,6 +15,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly AppHost _host;
     private bool _lastMinimized;
+    private IDisposable? _sensorLease;
 
     public MainWindow(AppHost host)
     {
@@ -28,6 +30,9 @@ public sealed partial class MainWindow : Window
 
         SettingsInfoBar.IsOpen = host.SettingsLoadResult == SettingsLoadResult.RecoveredFromCorrupt;
         Nav.SelectedItem = Nav.MenuItems[0];
+
+        Closed += (_, _) => ReleaseSensorLease();
+        UpdateSensorLease();
     }
 
     public bool IsMinimized => AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
@@ -50,7 +55,26 @@ public sealed partial class MainWindow : Window
         {
             _lastMinimized = minimized;
             ProcessEfficiency.SetEfficiencyMode(minimized);
+            UpdateSensorLease();
         }
+    }
+
+    private void UpdateSensorLease()
+    {
+        if (IsMinimized)
+        {
+            ReleaseSensorLease();
+        }
+        else
+        {
+            _sensorLease ??= _host.Demand.Acquire(Demand.HardwareSensors);
+        }
+    }
+
+    private void ReleaseSensorLease()
+    {
+        _sensorLease?.Dispose();
+        _sensorLease = null;
     }
 
     private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
