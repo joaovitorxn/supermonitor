@@ -80,13 +80,22 @@ public partial class App : Application
         }
 
         _exiting = true;
-        _tray?.Dispose();
-        _window?.Close();
-        if (_host is not null)
+        try
         {
-            await _host.DisposeAsync();
+            _tray?.Dispose();
+            _window?.Close();
+            if (_host is not null)
+            {
+                await _host.DisposeAsync();
+            }
         }
-
-        Exit();
+        catch (Exception ex)
+        {
+            Log.Error("Shutdown failed", ex);
+        }
+        finally
+        {
+            Exit();
+        }
     }
 }

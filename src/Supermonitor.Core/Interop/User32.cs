@@ -102,4 +102,23 @@ internal static unsafe partial class User32
 
     [LibraryImport("user32.dll")]
     public static partial int GetSystemMetrics(int index);
+
+    public const uint ASFW_ANY = 0xFFFFFFFF;
+    public const uint MSGFLT_ALLOW = 1;
+    public const uint WM_TIMER = 0x0113;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AllowSetForegroundWindow(uint processId);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ChangeWindowMessageFilterEx(nint hwnd, uint message, uint action, nint changeFilterStruct);
+
+    [LibraryImport("user32.dll")]
+    public static partial nuint SetTimer(nint hwnd, nuint id, uint elapseMs, nint timerProc);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool KillTimer(nint hwnd, nuint id);
 }

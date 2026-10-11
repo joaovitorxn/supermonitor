@@ -17,6 +17,8 @@ internal sealed class FakeProvider(string name) : ISensorProvider
 
     public float Value { get; set; } = 1;
 
+    public bool SkipWrite { get; set; }
+
     public List<TimeSpan> Elapsed { get; } = [];
 
     public bool Disposed { get; private set; }
@@ -42,7 +44,10 @@ internal sealed class FakeProvider(string name) : ISensorProvider
             throw new InvalidOperationException("boom");
         }
 
-        store.Write(_handle, Value);
+        if (!SkipWrite)
+        {
+            store.Write(_handle, Value);
+        }
     }
 
     public void Dispose() => Disposed = true;

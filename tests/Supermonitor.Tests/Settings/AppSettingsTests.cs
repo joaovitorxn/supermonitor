@@ -30,6 +30,16 @@ public class AppSettingsTests
     }
 
     [Fact]
+    public void Normalize_removes_null_and_blank_card_ids()
+    {
+        var settings = new AppSettings { OverviewCards = [null!, " ", "cpu.usage"] };
+
+        settings.Normalize();
+
+        Assert.Equal(new[] { "cpu.usage" }, settings.OverviewCards);
+    }
+
+    [Fact]
     public void Migrator_adds_version_to_unversioned_document()
     {
         var root = new JsonObject { ["pingHost"] = "9.9.9.9" };

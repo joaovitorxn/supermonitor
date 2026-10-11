@@ -39,6 +39,6 @@ public sealed class AppSettings
         }
 
         PingHost = string.IsNullOrWhiteSpace(PingHost) ? DefaultPingHost : PingHost.Trim();
-        OverviewCards ??= [.. DefaultOverviewCards];
+        OverviewCards = OverviewCards?.Where(id => !string.IsNullOrWhiteSpace(id)).ToList() ?? [.. DefaultOverviewCards];
     }
 }

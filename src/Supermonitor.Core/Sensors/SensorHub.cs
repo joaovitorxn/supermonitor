@@ -90,6 +90,8 @@ public sealed class SensorHub : IAsyncDisposable
                 continue;
             }
 
+            // Métricas que o provedor não reescrever nesta amostra (instância sumiu) viram NaN.
+            _store.InvalidateOwner(slot.Provider.Name);
             try
             {
                 slot.Provider.Sample(_store, elapsed);

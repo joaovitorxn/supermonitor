@@ -6,9 +6,13 @@ namespace Supermonitor.Core.Sensors.Network;
 
 public sealed unsafe class NetworkProvider : ISensorProvider
 {
-    private Adapter[] _adapters = [];
+    private static readonly TimeSpan RescanInterval = TimeSpan.FromSeconds(5);
+
+    private readonly NetworkAdapterRegistry _registry = new();
+    private readonly List<Adapter> _adapters = [];
     private MetricHandle _totalDown;
     private MetricHandle _totalUp;
+    private TimeSpan _sinceScan;
 
     public string Name => "Network";
 
@@ -16,47 +20,25 @@ public sealed unsafe class NetworkProvider : ISensorProvider
 
     public void Initialize(MetricStore store)
     {
-        Iphlpapi.MIB_IF_TABLE2* table;
-        var error = Iphlpapi.GetIfTable2(&table);
+        _totalDown = Register(store, MetricIds.NetworkTotalDown, "Download");
+        _totalUp = Register(store, MetricIds.NetworkTotalUp, "Upload");
+        var error = Scan(store);
         if (error != 0)
         {
             throw new Win32Exception((int)error);
         }
-
-        var adapters = new List<Adapter>();
-        try
-        {
-            var rows = &table->Table;
-            for (var i = 0; i < table->NumEntries; i++)
-            {
-                var row = &rows[i];
-                if (!NetworkAdapterFilter.IsMonitored(row->Type, row->OperStatus, row->InterfaceAndOperStatusFlags))
-                {
-                    continue;
-                }
-
-                var alias = new string(row->Alias);
-                var n = adapters.Count;
-                adapters.Add(new Adapter
-                {
-                    Luid = row->InterfaceLuid,
-                    Down = Register(store, MetricIds.NetworkDown(n), $"{alias} download"),
-                    Up = Register(store, MetricIds.NetworkUp(n), $"{alias} upload"),
-                });
-            }
-        }
-        finally
-        {
-            Iphlpapi.FreeMibTable(table);
-        }
-
-        _adapters = adapters.ToArray();
-        _totalDown = Register(store, MetricIds.NetworkTotalDown, "Download");
-        _totalUp = Register(store, MetricIds.NetworkTotalUp, "Upload");
     }
 
     public void Sample(MetricStore store, TimeSpan elapsed)
     {
+        // Adaptadores que sobem depois do início (Wi-Fi, VPN, USB) entram na próxima varredura.
+        _sinceScan += elapsed;
+        if (_sinceScan >= RescanInterval)
+        {
+            _sinceScan = TimeSpan.Zero;
+            Scan(store);
+        }
+
         double down = 0;
         double up = 0;
         var any = false;
@@ -97,6 +79,46 @@ public sealed unsafe class NetworkProvider : ISensorProvider
 
     public void Dispose()
     {
+    }
+
+    private uint Scan(MetricStore store)
+    {
+        Iphlpapi.MIB_IF_TABLE2* table;
+        var error = Iphlpapi.GetIfTable2(&table);
+        if (error != 0)
+        {
+            return error;
+        }
+
+        var monitored = new List<(ulong Luid, string Alias)>();
+        try
+        {
+            var rows = &table->Table;
+            for (var i = 0; i < table->NumEntries; i++)
+            {
+                var row = &rows[i];
+                if (NetworkAdapterFilter.IsMonitored(row->Type, row->OperStatus, row->InterfaceAndOperStatusFlags))
+                {
+                    monitored.Add((row->InterfaceLuid, new string(row->Alias)));
+                }
+            }
+        }
+        finally
+        {
+            Iphlpapi.FreeMibTable(table);
+        }
+
+        foreach (var (luid, index, alias) in _registry.AddNew(monitored))
+        {
+            _adapters.Add(new Adapter
+            {
+                Luid = luid,
+                Down = Register(store, MetricIds.NetworkDown(index), $"{alias} download"),
+                Up = Register(store, MetricIds.NetworkUp(index), $"{alias} upload"),
+            });
+        }
+
+        return 0;
     }
 
     private MetricHandle Register(MetricStore store, string id, string name) =>

@@ -68,6 +68,7 @@ public sealed class SettingsStoreTests : IDisposable
     [InlineData("{ not json")]
     [InlineData("[1, 2, 3]")]
     [InlineData("{ \"sampleIntervalMs\": \"fast\" }")]
+    [InlineData("{ \"version\": 1, \"version\": 1 }")]
     public void Corrupt_file_is_moved_to_bak_and_defaults_are_used(string content)
     {
         File.WriteAllText(FilePath, content);
@@ -76,6 +77,36 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(SettingsLoadResult.RecoveredFromCorrupt, store.Load());
         Assert.Equal(1000, store.Current.SampleIntervalMs);
         Assert.Equal(content, File.ReadAllText(FilePath + ".bak"));
+    }
+
+    [Fact]
+    public void Locked_file_on_load_falls_back_to_defaults_without_throwing()
+    {
+        File.WriteAllText(FilePath, "{ \"version\": 1, \"sampleIntervalMs\": 500 }");
+        using var lockHandle = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+        using var store = CreateStore();
+
+        Assert.Equal(SettingsLoadResult.Unreadable, store.Load());
+        Assert.Equal(1000, store.Current.SampleIntervalMs);
+    }
+
+    [Fact]
+    public void Flush_to_read_only_file_does_not_throw()
+    {
+        File.WriteAllText(FilePath, "{}");
+        File.SetAttributes(FilePath, FileAttributes.ReadOnly);
+        try
+        {
+            using var store = CreateStore();
+            store.Load();
+            store.RequestSave();
+
+            Assert.Null(Record.Exception(store.Flush));
+        }
+        finally
+        {
+            File.SetAttributes(FilePath, FileAttributes.Normal);
+        }
     }
 
     [Fact]

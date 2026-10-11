@@ -9,6 +9,7 @@ public enum SettingsLoadResult
     Loaded,
     CreatedDefault,
     RecoveredFromCorrupt,
+    Unreadable,
 }
 
 public sealed class SettingsStore : IDisposable
@@ -36,9 +37,21 @@ public sealed class SettingsStore : IDisposable
             return SettingsLoadResult.CreatedDefault;
         }
 
+        string text;
         try
         {
-            var root = JsonNode.Parse(File.ReadAllText(_path)) as JsonObject
+            text = File.ReadAllText(_path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn("Settings file could not be read; using defaults", ex);
+            Current = new AppSettings();
+            return SettingsLoadResult.Unreadable;
+        }
+
+        try
+        {
+            var root = JsonNode.Parse(text) as JsonObject
                 ?? throw new JsonException("Settings root is not an object.");
             var migrated = SettingsMigrator.Migrate(root);
             Current = migrated.Deserialize(SettingsJsonContext.Default.AppSettings)
@@ -46,12 +59,24 @@ public sealed class SettingsStore : IDisposable
             Current.Normalize();
             return SettingsLoadResult.Loaded;
         }
-        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or NotSupportedException)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             Log.Warn("Settings file is corrupt; moving it to .bak and using defaults", ex);
-            File.Move(_path, _path + ".bak", overwrite: true);
+            TryMoveToBackup();
             Current = new AppSettings();
             return SettingsLoadResult.RecoveredFromCorrupt;
+        }
+    }
+
+    private void TryMoveToBackup()
+    {
+        try
+        {
+            File.Move(_path, _path + ".bak", overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn("Could not move the corrupt settings file to .bak", ex);
         }
     }
 
@@ -87,7 +112,7 @@ public sealed class SettingsStore : IDisposable
             File.WriteAllText(temp, json);
             File.Move(temp, _path, overwrite: true);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Error("Failed to save settings", ex);
         }

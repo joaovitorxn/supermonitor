@@ -39,7 +39,7 @@ public class GpuEngineAggregatorTests
         aggregator.Add("pid_1_luid_0x00000000_0x0000D1F2_phys_0_eng_x_engtype_3D", 90);
         aggregator.Add(Instance(1, 0, "3D"), double.NaN);
 
-        Assert.Equal(0, aggregator.GetUsage(0).Total);
+        Assert.True(float.IsNaN(aggregator.GetUsage(0).Total));
     }
 
     [Fact]
@@ -53,12 +53,23 @@ public class GpuEngineAggregatorTests
     }
 
     [Fact]
+    public void Adapter_without_any_engine_instance_reports_nan()
+    {
+        var aggregator = new GpuEngineAggregator([Luid, "0x00000000_0x0000AAAA"]);
+        aggregator.Add(Instance(1, 0, "3D"), 40);
+
+        Assert.Equal(40, aggregator.GetUsage(0).Total);
+        Assert.True(float.IsNaN(aggregator.GetUsage(1).Total));
+        Assert.True(float.IsNaN(aggregator.GetUsage(1).ThreeD));
+    }
+
+    [Fact]
     public void Reset_clears_previous_tick()
     {
         var aggregator = new GpuEngineAggregator([Luid]);
         aggregator.Add(Instance(1, 0, "3D"), 40);
         aggregator.Reset();
 
-        Assert.Equal(0, aggregator.GetUsage(0).Total);
+        Assert.True(float.IsNaN(aggregator.GetUsage(0).Total));
     }
 }

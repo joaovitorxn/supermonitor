@@ -70,6 +70,35 @@ public class SensorHubTests
     }
 
     [Fact]
+    public void Metric_not_written_in_a_sample_becomes_nan()
+    {
+        var store = new MetricStore(10);
+        var provider = new FakeProvider("p");
+        var hub = CreateHub(store, new FakeTimeProvider(), provider);
+        hub.Tick();
+        Assert.Equal(1, store.GetLatest(provider.MetricId));
+
+        provider.SkipWrite = true;
+        hub.Tick();
+
+        Assert.True(float.IsNaN(store.GetLatest(provider.MetricId)));
+    }
+
+    [Fact]
+    public void Metric_of_provider_not_due_keeps_its_last_value()
+    {
+        var store = new MetricStore(10);
+        var time = new FakeTimeProvider();
+        var provider = new FakeProvider("slow") { MinInterval = TimeSpan.FromSeconds(5) };
+        var hub = CreateHub(store, time, provider);
+        hub.Tick();
+        time.Advance(TimeSpan.FromSeconds(1));
+        hub.Tick();
+
+        Assert.Equal(1, store.GetLatest(provider.MetricId));
+    }
+
+    [Fact]
     public void MinInterval_skips_samples_until_due_and_reports_elapsed()
     {
         var time = new FakeTimeProvider();

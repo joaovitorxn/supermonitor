@@ -1,3 +1,5 @@
+using Supermonitor.Core.Interop;
+
 namespace Supermonitor.Core.Shell;
 
 public sealed record SingleInstanceNames(string Mutex, string ActivateEvent)
@@ -34,6 +36,8 @@ public sealed class SingleInstance : IDisposable
     {
         if (EventWaitHandle.TryOpenExisting(names.ActivateEvent, out var handle))
         {
+            // Este processo tem o direito de foco (o usuário acabou de abri-lo); repassa à instância existente.
+            User32.AllowSetForegroundWindow(User32.ASFW_ANY);
             using (handle)
             {
                 handle.Set();

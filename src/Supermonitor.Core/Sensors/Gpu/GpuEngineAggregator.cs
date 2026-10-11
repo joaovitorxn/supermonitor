@@ -21,15 +21,21 @@ public sealed class GpuEngineAggregator
     private readonly string[] _luids;
     private readonly double[] _sums;
     private readonly GpuEngineKind[] _kinds;
+    private readonly bool[] _matched;
 
     public GpuEngineAggregator(IReadOnlyList<string> adapterLuids)
     {
         _luids = adapterLuids.ToArray();
         _sums = new double[_luids.Length * MaxEngines];
         _kinds = new GpuEngineKind[_luids.Length * MaxEngines];
+        _matched = new bool[_luids.Length];
     }
 
-    public void Reset() => Array.Clear(_sums);
+    public void Reset()
+    {
+        Array.Clear(_sums);
+        Array.Clear(_matched);
+    }
 
     // Formato: "pid_1234_luid_0x00000000_0x0000D1F2_phys_0_eng_0_engtype_3D".
     public void Add(ReadOnlySpan<char> instanceName, double value)
@@ -48,10 +54,17 @@ public sealed class GpuEngineAggregator
         var slot = adapter * MaxEngines + engine;
         _sums[slot] += value;
         _kinds[slot] = Classify(engineType);
+        _matched[adapter] = true;
     }
 
     public GpuUsage GetUsage(int adapter)
     {
+        if (!_matched[adapter])
+        {
+            // Nenhuma instância deste adaptador (ex.: LUID mudou após atualização do driver).
+            return new GpuUsage(float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN);
+        }
+
         double total = 0, threeD = 0, copy = 0, decode = 0, encode = 0, compute = 0;
         for (var engine = 0; engine < MaxEngines; engine++)
         {
