@@ -12,5 +12,6 @@ public class StructLayoutTests
         Assert.Equal(104, Unsafe.SizeOf<Psapi.PERFORMANCE_INFORMATION>());
         Assert.Equal(176, Unsafe.SizeOf<Ntdll.SYSTEM_MEMORY_LIST_INFORMATION>());
         Assert.Equal(1352, Unsafe.SizeOf<Iphlpapi.MIB_IF_ROW2>());
+        Assert.Equal(312, Unsafe.SizeOf<Dxgi.DXGI_ADAPTER_DESC1>());
     }
 }

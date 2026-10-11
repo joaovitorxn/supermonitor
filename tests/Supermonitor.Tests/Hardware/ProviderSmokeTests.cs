@@ -2,6 +2,7 @@ using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
 using Supermonitor.Core.Sensors.Disk;
+using Supermonitor.Core.Sensors.Gpu;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
 
@@ -77,5 +78,16 @@ public class ProviderSmokeTests
 
         Assert.True(store.GetLatest(MetricIds.NetworkTotalDown) >= 0);
         Assert.True(store.GetLatest(MetricIds.NetworkTotalUp) >= 0);
+    }
+
+    [Fact]
+    public void Gpu_provider_reports_usage_and_vram_for_first_gpu()
+    {
+        using var provider = new GpuProvider();
+        var store = SampleTwice(provider);
+
+        Assert.InRange(store.GetLatest(MetricIds.GpuUsage(0)), 0, 100);
+        Assert.True(store.GetLatest(MetricIds.GpuVramTotal(0)) > 0);
+        Assert.True(store.GetLatest(MetricIds.GpuVramUsed(0)) > 0);
     }
 }
