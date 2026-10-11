@@ -64,6 +64,36 @@ public class GpuEngineAggregatorTests
     }
 
     [Fact]
+    public void Per_process_usage_takes_the_busiest_engine_of_each_pid()
+    {
+        var aggregator = new GpuEngineAggregator([Luid]);
+        aggregator.Add(Instance(100, 0, "3D"), 30);
+        aggregator.Add(Instance(100, 1, "Copy"), 10);
+        aggregator.Add(Instance(200, 0, "3D"), 25);
+        aggregator.Add(Instance(300, 0, "3D", "0x00000000_0x0000AAAA"), 90);
+        var usage = new Dictionary<int, float>();
+
+        aggregator.CopyProcessUsage(usage);
+
+        Assert.Equal(30, usage[100]);
+        Assert.Equal(25, usage[200]);
+        Assert.False(usage.ContainsKey(300));
+    }
+
+    [Fact]
+    public void Reset_clears_per_process_usage()
+    {
+        var aggregator = new GpuEngineAggregator([Luid]);
+        aggregator.Add(Instance(100, 0, "3D"), 30);
+        aggregator.Reset();
+        var usage = new Dictionary<int, float>();
+
+        aggregator.CopyProcessUsage(usage);
+
+        Assert.Empty(usage);
+    }
+
+    [Fact]
     public void Reset_clears_previous_tick()
     {
         var aggregator = new GpuEngineAggregator([Luid]);

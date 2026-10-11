@@ -22,6 +22,7 @@ public sealed class GpuEngineAggregator
     private readonly double[] _sums;
     private readonly GpuEngineKind[] _kinds;
     private readonly bool[] _matched;
+    private readonly Dictionary<int, double> _processes = [];
 
     public GpuEngineAggregator(IReadOnlyList<string> adapterLuids)
     {
@@ -35,6 +36,7 @@ public sealed class GpuEngineAggregator
     {
         Array.Clear(_sums);
         Array.Clear(_matched);
+        _processes.Clear();
     }
 
     // Formato: "pid_1234_luid_0x00000000_0x0000D1F2_phys_0_eng_0_engtype_3D".
@@ -55,6 +57,31 @@ public sealed class GpuEngineAggregator
         _sums[slot] += value;
         _kinds[slot] = Classify(engineType);
         _matched[adapter] = true;
+        if (TryParsePid(instanceName, out var pid))
+        {
+            _processes[pid] = Math.Max(_processes.GetValueOrDefault(pid), value);
+        }
+    }
+
+    public void CopyProcessUsage(Dictionary<int, float> target)
+    {
+        foreach (var (pid, value) in _processes)
+        {
+            target[pid] = (float)Math.Min(value, 100);
+        }
+    }
+
+    private static bool TryParsePid(ReadOnlySpan<char> name, out int pid)
+    {
+        pid = 0;
+        if (!name.StartsWith("pid_"))
+        {
+            return false;
+        }
+
+        var rest = name[4..];
+        var end = rest.IndexOf('_');
+        return end > 0 && int.TryParse(rest[..end], NumberStyles.None, CultureInfo.InvariantCulture, out pid);
     }
 
     public GpuUsage GetUsage(int adapter)

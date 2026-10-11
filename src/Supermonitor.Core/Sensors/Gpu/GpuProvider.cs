@@ -3,7 +3,7 @@ using Supermonitor.Core.Sensors.Pdh;
 
 namespace Supermonitor.Core.Sensors.Gpu;
 
-public sealed class GpuProvider : ISensorProvider
+public sealed class GpuProvider(ProcessGpuUsage? processUsage = null) : ISensorProvider
 {
     private Adapter[] _adapters = [];
     private GpuEngineAggregator? _aggregator;
@@ -46,6 +46,8 @@ public sealed class GpuProvider : ISensorProvider
         {
             _aggregator.Add(engines.NameAt(i), engines.ValueAt(i));
         }
+
+        processUsage?.Publish(_aggregator);
 
         for (var n = 0; n < _adapters.Length; n++)
         {

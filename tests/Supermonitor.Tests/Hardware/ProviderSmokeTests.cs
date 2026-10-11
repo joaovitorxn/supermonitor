@@ -7,6 +7,7 @@ using Supermonitor.Core.Sensors.Gpu;
 using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
+using Supermonitor.Core.Sensors.Processes;
 
 namespace Supermonitor.Tests.Hardware;
 
@@ -106,5 +107,16 @@ public class ProviderSmokeTests
         Assert.InRange(store.GetLatest(MetricIds.GpuTemperature(0)), 1, 120);
         Assert.True(store.TryGetDescriptor(MetricIds.GpuTemperature(0), out var descriptor));
         Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
+    }
+
+    [Fact]
+    public void Process_monitor_lists_this_process_with_cpu_usage()
+    {
+        using var provider = new ProcessMonitor(new ProcessGpuUsage());
+        SampleTwice(provider);
+
+        var self = Assert.Single(provider.Snapshot, p => p.ProcessId == Environment.ProcessId);
+        Assert.True(float.IsFinite(self.CpuPercent));
+        Assert.True(self.PrivateBytes > 0);
     }
 }

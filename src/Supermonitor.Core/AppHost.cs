@@ -7,6 +7,7 @@ using Supermonitor.Core.Sensors.Gpu;
 using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
+using Supermonitor.Core.Sensors.Processes;
 using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
 
@@ -18,8 +19,9 @@ public sealed class AppHost : IAsyncDisposable
 
     private readonly PingMonitor _ping;
 
-    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping, DemandTracker demand)
+    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping, DemandTracker demand, ProcessMonitor processes)
     {
+        Processes = processes;
         Demand = demand;
         Settings = settings;
         SettingsLoadResult = loadResult;
@@ -37,6 +39,8 @@ public sealed class AppHost : IAsyncDisposable
     public SensorHub Hub { get; }
 
     public DemandTracker Demand { get; }
+
+    public ProcessMonitor Processes { get; }
 
     public static IReadOnlyList<string> MonitoredGpuNames() =>
         DxgiAdapters.Enumerate()
@@ -58,20 +62,23 @@ public sealed class AppHost : IAsyncDisposable
 
         var metrics = new MetricStore(HistoryCapacity);
         var demand = new DemandTracker();
+        var processGpu = new ProcessGpuUsage();
+        var processes = new ProcessMonitor(processGpu);
         var ping = new PingMonitor(() => settings.Current.PingHost, TimeSpan.FromSeconds(2));
         ISensorProvider[] providers =
         [
             new CpuProvider(),
             new MemoryProvider(),
-            new GpuProvider(),
+            new GpuProvider(processGpu),
             new HardwareProvider(MonitoredGpuNames),
             new DiskProvider(),
             new DriveSpaceProvider(),
             new NetworkProvider(),
             new PingProvider(ping),
+            processes,
         ];
         var hub = new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs), demand);
-        return new AppHost(settings, loadResult, metrics, hub, ping, demand);
+        return new AppHost(settings, loadResult, metrics, hub, ping, demand, processes);
     }
 
     public void Start()
