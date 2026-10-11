@@ -5,6 +5,7 @@ using Supermonitor.Core;
 using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
 using Supermonitor.ViewModels;
+using Supermonitor.Views;
 using WinRT.Interop;
 
 namespace Supermonitor;
@@ -60,6 +61,11 @@ public sealed partial class MainWindow : Window
 
     private void Navigate(string? tag, PageContext context)
     {
-        // Páginas adicionadas nas Tasks 15 (overview) e 16 (settings).
+        switch (tag)
+        {
+            case "overview":
+                ContentFrame.Navigate(typeof(OverviewPage), context);
+                break;
+        }
     }
 }
