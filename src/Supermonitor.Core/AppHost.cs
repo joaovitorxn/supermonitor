@@ -1,4 +1,5 @@
 using Supermonitor.Core.Diagnostics;
+using Supermonitor.Core.Frames;
 using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
@@ -19,10 +20,11 @@ public sealed class AppHost : IAsyncDisposable
 
     private readonly PingMonitor _ping;
 
-    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping, DemandTracker demand, ProcessMonitor processes)
+    private AppHost(SettingsStore settings, SettingsLoadResult loadResult, MetricStore metrics, SensorHub hub, PingMonitor ping, DemandTracker demand, ProcessMonitor processes, FrameCaptureService frames)
     {
         Processes = processes;
         Demand = demand;
+        Frames = frames;
         Settings = settings;
         SettingsLoadResult = loadResult;
         Metrics = metrics;
@@ -41,6 +43,8 @@ public sealed class AppHost : IAsyncDisposable
     public DemandTracker Demand { get; }
 
     public ProcessMonitor Processes { get; }
+
+    public FrameCaptureService Frames { get; }
 
     public static IReadOnlyList<string> MonitoredGpuNames() =>
         DxgiAdapters.Enumerate()
@@ -62,6 +66,7 @@ public sealed class AppHost : IAsyncDisposable
 
         var metrics = new MetricStore(HistoryCapacity);
         var demand = new DemandTracker();
+        var frames = new FrameCaptureService(demand, () => new EtwPresentSource(), new ForegroundProbe(), TimeProvider.System, Environment.ProcessId);
         var processGpu = new ProcessGpuUsage();
         var processes = new ProcessMonitor(processGpu);
         var ping = new PingMonitor(() => settings.Current.PingHost, TimeSpan.FromSeconds(2));
@@ -78,7 +83,7 @@ public sealed class AppHost : IAsyncDisposable
             processes,
         ];
         var hub = new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs), demand);
-        return new AppHost(settings, loadResult, metrics, hub, ping, demand, processes);
+        return new AppHost(settings, loadResult, metrics, hub, ping, demand, processes, frames);
     }
 
     public void Start()
@@ -90,6 +95,7 @@ public sealed class AppHost : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _ping.Dispose();
+        Frames.Dispose();
         await Hub.DisposeAsync().ConfigureAwait(false);
         Settings.Dispose();
         Log.Info("Supermonitor stopped");
