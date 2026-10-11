@@ -21,6 +21,10 @@ public static class MetricIds
     public const string PingJitter = "net.jitter";
     public const string PingLoss = "net.loss";
 
+    public const string CpuTemperature = "cpu.temp";
+    public const string CpuPower = "cpu.power";
+    public const string CpuClock = "cpu.clock";
+
     public static string CpuCoreUsage(int core) => $"cpu.core{core}.usage";
 
     public static string GpuUsage(int gpu) => $"gpu{gpu}.usage";
@@ -40,6 +44,22 @@ public static class MetricIds
     public static string GpuVramTotal(int gpu) => $"gpu{gpu}.vram.total";
 
     public static string GpuSharedUsed(int gpu) => $"gpu{gpu}.shared.used";
+
+    public static string GpuTemperature(int gpu) => $"gpu{gpu}.temp";
+
+    public static string GpuHotspot(int gpu) => $"gpu{gpu}.hotspot";
+
+    public static string GpuMemoryTemperature(int gpu) => $"gpu{gpu}.memtemp";
+
+    public static string GpuClock(int gpu) => $"gpu{gpu}.clock";
+
+    public static string GpuMemoryClock(int gpu) => $"gpu{gpu}.memclock";
+
+    public static string GpuPower(int gpu) => $"gpu{gpu}.power";
+
+    public static string GpuFan(int gpu) => $"gpu{gpu}.fan";
+
+    public static string GpuFanPercent(int gpu) => $"gpu{gpu}.fanpct";
 
     public static string DiskRead(int disk) => $"disk{disk}.read";
 
