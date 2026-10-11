@@ -206,6 +206,9 @@ public sealed partial class MainWindow : Window
             case "processes":
                 ContentFrame.Navigate(typeof(ProcessesPage), context);
                 break;
+            case "overlay":
+                ContentFrame.Navigate(typeof(OverlayPage), context);
+                break;
             case "settings":
                 ContentFrame.Navigate(typeof(SettingsPage), context);
                 break;
