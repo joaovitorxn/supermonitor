@@ -5,6 +5,27 @@
     <ScrollViewer Padding="24">
         <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
             <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" />
+
+            <TextBlock Text="Appearance" Style="{StaticResource SubtitleTextBlockStyle}" />
+            <RadioButtons x:Name="ThemeButtons" Header="Theme" SelectionChanged="OnThemeChanged">
+                <RadioButton Content="Use system setting" />
+                <RadioButton Content="Light" />
+                <RadioButton Content="Dark" />
+            </RadioButtons>
+            <ComboBox x:Name="BackdropBox" Header="Window background" MinWidth="200" SelectionChanged="OnBackdropChanged">
+                <ComboBoxItem Content="Mica" />
+                <ComboBoxItem Content="Mica Alt" />
+                <ComboBoxItem Content="Acrylic" />
+                <ComboBoxItem Content="Solid" />
+            </ComboBox>
+            <ToggleSwitch x:Name="SystemAccentSwitch" Header="Use the Windows accent color for charts" Toggled="OnSystemAccentToggled" />
+            <ColorPicker x:Name="AccentPicker" IsAlphaEnabled="False" IsMoreButtonVisible="False" ColorChanged="OnAccentChanged" Visibility="Collapsed" />
+
+            <TextBlock Text="Units" Style="{StaticResource SubtitleTextBlockStyle}" />
+            <ToggleSwitch x:Name="BitsSwitch" Header="Show network speed in bits per second" Toggled="OnUnitsToggled" />
+            <ToggleSwitch x:Name="FahrenheitSwitch" Header="Show temperatures in °F" Toggled="OnUnitsToggled" />
+
+            <TextBlock Text="Monitoring" Style="{StaticResource SubtitleTextBlockStyle}" />
             <ComboBox x:Name="IntervalBox" Header="Update interval" MinWidth="200" SelectionChanged="OnIntervalChanged">
                 <ComboBoxItem Content="250 ms" />
                 <ComboBoxItem Content="500 ms" />
@@ -15,9 +36,15 @@
                 <TextBox x:Name="PingHostBox" Header="Ping host" Width="320" HorizontalAlignment="Left" LostFocus="OnPingHostLostFocus" />
                 <TextBlock x:Name="PingHostError" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
             </StackPanel>
+
+            <TextBlock Text="Startup" Style="{StaticResource SubtitleTextBlockStyle}" />
             <ToggleSwitch x:Name="StartWithWindowsSwitch" Header="Start with Windows" Toggled="OnStartWithWindowsToggled" />
             <TextBlock x:Name="AutostartError" Visibility="Collapsed" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
             <ToggleSwitch x:Name="StartMinimizedSwitch" Header="Start minimized to the system tray" Toggled="OnStartMinimizedToggled" />
+
+            <TextBlock Text="Sensors" Style="{StaticResource SubtitleTextBlockStyle}" />
+            <TextBlock x:Name="PawnIoStatus" TextWrapping="Wrap" />
+            <TextBlock x:Name="ProviderStatus" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
     </ScrollViewer>
 </Page>

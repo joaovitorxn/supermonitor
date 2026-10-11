@@ -76,7 +76,12 @@ public static class AutostartManager
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         })!;
-        process.WaitForExit(10_000);
+        if (!process.WaitForExit(10_000))
+        {
+            process.Kill();
+            return -1;
+        }
+
         return process.ExitCode;
     }
 }
