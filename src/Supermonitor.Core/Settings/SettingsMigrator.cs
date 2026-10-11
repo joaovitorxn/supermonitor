@@ -11,13 +11,13 @@ public static class SettingsMigrator
     {
         var version = root["version"]?.GetValue<int>() ?? 0;
 
-        // v0 → v1: arquivos sem número de versão. Nenhum campo mudou.
+        // v0 → v1: files without a version number. No field changed.
         if (version < 1)
         {
             version = 1;
         }
 
-        // v1 → v2: "overviewCards": ["id"] vira "cards": [{ "metricId": "id" }].
+        // v1 → v2: "overviewCards": ["id"] becomes "cards": [{ "metricId": "id" }].
         if (version < 2)
         {
             if (root["overviewCards"] is JsonArray ids)
@@ -38,7 +38,7 @@ public static class SettingsMigrator
             version = 2;
         }
 
-        // v2 → v3: o bloco "overlay" é novo; ausente, o AppSettings usa os padrões. Nenhum campo mudou.
+        // v2 → v3: the "overlay" block is new; when absent, AppSettings uses defaults. No field changed.
         if (version < 3)
         {
             version = 3;

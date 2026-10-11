@@ -40,7 +40,7 @@ public static class OverlayMetricCatalog
         _ => MetricUnit.Count,
     };
 
-    // Id da MetricStore; null para FPS/frametime/1% low (vêm do FrameCaptureService) e para o relógio.
+    // MetricStore id; null for FPS/frametime/1% low (from FrameCaptureService) and for the clock.
     public static string? StoreMetricId(OverlayMetric metric) => metric switch
     {
         OverlayMetric.CpuUsage => MetricIds.CpuUsage,
@@ -59,7 +59,7 @@ public static class OverlayMetricCatalog
         _ => null,
     };
 
-    // FPS e 1% low pioram quando caem; os demais pioram quando sobem.
+    // FPS and 1% low get worse when they fall; the others get worse when they rise.
     public static bool LowerIsWorse(OverlayMetric metric) => metric is OverlayMetric.Fps or OverlayMetric.Low1Percent;
 
     public static Demand? Demand(OverlayMetric metric) => metric switch
@@ -82,6 +82,6 @@ public static class OverlayDemand
 
 public static class OverlayRefresh
 {
-    // O mini-gráfico de frametime redesenha a até 30 Hz; sem ele vale a taxa configurada.
+    // The frametime mini-graph redraws at up to 30 Hz; without it the configured rate applies.
     public static int EffectiveHz(OverlayStyle style) => style.ShowFrameGraph ? 30 : style.RefreshHz;
 }

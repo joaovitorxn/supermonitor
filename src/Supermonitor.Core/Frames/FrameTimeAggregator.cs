@@ -7,8 +7,8 @@ public readonly record struct FrameStats(bool HasData, double Fps, double FrameT
     public static FrameStats None { get; } = new(false, double.NaN, double.NaN, double.NaN, 0);
 }
 
-// Recebe os instantes (ms) dos presents do processo alvo e calcula FPS, frametime e 1% low.
-// Escrito pela thread do ETW e lido pelas threads do overlay e do dashboard; tudo sob um lock curto.
+// Receives present timestamps (ms) of the target process and computes FPS, frametime and 1% low.
+// Written by the ETW thread, read by the overlay and dashboard threads; all under a short lock.
 public sealed class FrameTimeAggregator
 {
     public const int Capacity = 16384;
@@ -44,7 +44,7 @@ public sealed class FrameTimeAggregator
 
             if (delta > MaxGapMs)
             {
-                // Pausa longa (loading, alt-tab, jogo minimizado): recomeça a sequência sem registrar o intervalo.
+                // Long pause (loading, alt-tab, minimized game): restarts the sequence without recording the interval.
                 _timestamps.Clear();
                 _frameTimes.Clear();
                 _last = timestampMs;

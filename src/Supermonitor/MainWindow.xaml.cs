@@ -43,6 +43,14 @@ public sealed partial class MainWindow : Window
         SettingsInfoBar.IsOpen = App.Current.ConsumeSettingsWarning();
         PawnIoInfoBar.IsOpen = !HardwareProvider.IsPawnIoInstalled && !App.Current.PawnIoBannerDismissed;
         Nav.SelectedItem = Nav.MenuItems[0];
+        // The NavigationView settings item uses the localized Windows text; the app is all English.
+        Nav.Loaded += (_, _) =>
+        {
+            if (Nav.SettingsItem is NavigationViewItem settingsItem)
+            {
+                settingsItem.Content = "Settings";
+            }
+        };
 
         Closed += (_, _) =>
         {
@@ -54,7 +62,7 @@ public sealed partial class MainWindow : Window
         UpdateSensorLease();
     }
 
-    // Janela fechada conta como minimizada: os view models das páginas viram no-ops mesmo que Unloaded não dispare.
+    // A closed window counts as minimized: page view models become no-ops even if Unloaded does not fire.
     public bool IsMinimized => _closed || AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
 
     public void BringToFront()
@@ -136,7 +144,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    // Páginas pedem processos por aqui; a lease real só existe com janela visível e ao menos uma página interessada.
+    // Pages request processes here; the real lease exists only with a visible window and at least one interested page.
     private IDisposable AcquireProcesses()
     {
         _processConsumers++;

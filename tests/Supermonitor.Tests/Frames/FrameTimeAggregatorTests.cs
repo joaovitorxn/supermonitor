@@ -4,7 +4,7 @@ namespace Supermonitor.Tests.Frames;
 
 public class FrameTimeAggregatorTests
 {
-    // Primeiro present não gera frametime (não há anterior); cada intervalo vira um frametime.
+    // The first present yields no frametime (no previous one); each interval becomes a frametime.
     private static FrameTimeAggregator Feed(params double[] frameTimesMs)
     {
         var aggregator = new FrameTimeAggregator();
@@ -53,7 +53,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void One_percent_low_comes_from_the_ninety_ninth_percentile_frame_time()
     {
-        // 100 frames: 96 de 10 ms e 4 de 40 ms → posto 99 = 40 ms → 25 FPS.
+        // 100 frames: 96 of 10 ms and 4 of 40 ms → rank 99 = 40 ms → 25 FPS.
         var frameTimes = Enumerable.Repeat(10.0, 100).ToArray();
         frameTimes[20] = frameTimes[40] = frameTimes[60] = frameTimes[80] = 40;
 
@@ -66,7 +66,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void Fps_uses_only_the_last_second()
     {
-        // 5 s a 50 FPS (20 ms) seguidos de 1,5 s a 100 FPS (10 ms).
+        // 5 s at 50 FPS (20 ms) followed by 1.5 s at 100 FPS (10 ms).
         var frameTimes = Enumerable.Repeat(20.0, 250).Concat(Enumerable.Repeat(10.0, 150)).ToArray();
 
         var stats = Feed(frameTimes).GetStats();
@@ -94,7 +94,7 @@ public class FrameTimeAggregatorTests
     [Fact]
     public void A_short_pause_is_kept_as_a_frame_time()
     {
-        // 4 frames: o posto 99 é o maior (800 ms) → 1,25 FPS de 1% low; o frametime atual segue sendo o último.
+        // 4 frames: rank 99 is the largest (800 ms) → 1.25 FPS 1% low; the current frametime stays the last one.
         var stats = Feed(10, 10, 800, 10).GetStats();
 
         Assert.Equal(1000.0 / 800, stats.Low1PercentFps, 1e-6);

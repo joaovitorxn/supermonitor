@@ -7,6 +7,7 @@ namespace Supermonitor.Dialogs;
 
 public sealed class OverlayItemDialog : ContentDialog
 {
+    private readonly TextBox _name;
     private readonly TextBox _labelColor;
     private readonly TextBox _valueColor;
     private readonly NumberBox _warning;
@@ -18,11 +19,12 @@ public sealed class OverlayItemDialog : ContentDialog
     {
         _item = item;
         Result = item.Clone();
-        Title = $"{OverlayMetricCatalog.Label(item.Metric)} — colors and thresholds";
+        Title = $"{OverlayMetricCatalog.Label(item.Metric)} — label, colors and thresholds";
         PrimaryButtonText = "Save";
         CloseButtonText = "Cancel";
         DefaultButton = ContentDialogButton.Primary;
 
+        _name = new TextBox { Header = "Label", PlaceholderText = OverlayMetricCatalog.Label(item.Metric), Text = item.CustomLabel ?? string.Empty, MaxLength = OverlayStyle.MaxLabelLength };
         _labelColor = new TextBox { Header = "Label color", PlaceholderText = "#RRGGBB — empty uses the overlay default", Text = item.LabelColor ?? string.Empty };
         _valueColor = new TextBox { Header = "Value color", PlaceholderText = "#RRGGBB — empty uses the overlay default", Text = item.ValueColor ?? string.Empty };
         _warning = new NumberBox { Header = "Warning at", Value = item.Threshold?.Warning ?? double.NaN, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
@@ -33,6 +35,7 @@ public sealed class OverlayItemDialog : ContentDialog
             Spacing = 12,
             Children =
             {
+                _name,
                 _labelColor,
                 _valueColor,
                 new TextBlock { Text = "Thresholds use the metric's base unit (°C, %, bytes, ms). Leave both empty to use the dashboard thresholds.", TextWrapping = TextWrapping.Wrap },
@@ -67,6 +70,8 @@ public sealed class OverlayItemDialog : ContentDialog
         }
 
         var result = _item.Clone();
+        var name = _name.Text.Trim();
+        result.CustomLabel = name.Length == 0 ? null : name;
         result.LabelColor = label.Length == 0 ? null : label.ToUpperInvariant();
         result.ValueColor = value.Length == 0 ? null : value.ToUpperInvariant();
         result.Threshold = hasWarning ? new MetricThreshold { Warning = (float)_warning.Value, Critical = (float)_critical.Value } : null;

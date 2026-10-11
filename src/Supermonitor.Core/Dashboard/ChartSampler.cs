@@ -2,7 +2,7 @@ namespace Supermonitor.Core.Dashboard;
 
 public static class ChartSampler
 {
-    // Reduz a série para a largura do gráfico guardando o pico de cada balde (picos importam para gamers).
+    // Downsamples the series to the chart width, keeping each bucket's peak (peaks matter to gamers).
     public static int Downsample(ReadOnlySpan<float> source, Span<float> destination)
     {
         if (destination.IsEmpty)

@@ -31,7 +31,7 @@ public sealed unsafe class TrayIcon : IDisposable
         _icon = User32.LoadImageW(0, iconPath, User32.IMAGE_ICON, User32.GetSystemMetrics(User32.SM_CXSMICON), User32.GetSystemMetrics(User32.SM_CYSMICON), User32.LR_LOADFROMFILE);
         _window = new HiddenWindow("Supermonitor.Tray", HandleMessage);
 
-        // Processo elevado: o UIPI bloqueia o broadcast TaskbarCreated vindo do Explorer sem esta exceção.
+        // Elevated process: UIPI blocks the TaskbarCreated broadcast from Explorer without this exception.
         User32.ChangeWindowMessageFilterEx(_window.Handle, _taskbarCreated, User32.MSGFLT_ALLOW, 0);
         Add();
     }
@@ -53,7 +53,7 @@ public sealed unsafe class TrayIcon : IDisposable
         var data = CreateData(Shell32.NIF_MESSAGE | Shell32.NIF_ICON | Shell32.NIF_TIP | Shell32.NIF_SHOWTIP);
         if (!Shell32.Shell_NotifyIconW(Shell32.NIM_ADD, &data))
         {
-            // Barra de tarefas ainda não existe (autostart no logon): tenta de novo até conseguir.
+            // Taskbar doesn't exist yet (autostart at logon): retries until it does.
             User32.SetTimer(_window.Handle, RetryTimerId, RetryIntervalMs, 0);
             return;
         }

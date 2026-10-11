@@ -28,7 +28,7 @@ internal static unsafe partial class Dxgi
     [LibraryImport("dxgi.dll")]
     public static partial int CreateDXGIFactory1(Guid* riid, void** factory);
 
-    // Índices da vtable: IUnknown (0-2), IDXGIObject (3-6), IDXGIFactory (7-11), IDXGIFactory1.EnumAdapters1 = 12.
+    // vtable indices: IUnknown (0-2), IDXGIObject (3-6), IDXGIFactory (7-11), IDXGIFactory1.EnumAdapters1 = 12.
     public static int EnumAdapters1(void* factory, uint index, void** adapter) =>
         ((delegate* unmanaged<void*, uint, void**, int>)(*(void***)factory)[12])(factory, index, adapter);
 

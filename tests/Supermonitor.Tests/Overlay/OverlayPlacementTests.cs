@@ -18,7 +18,7 @@ public class OverlayPlacementTests
     [InlineData(OverlayAnchor.BottomRight, 1810, 1020)]
     public void Anchors_place_the_overlay_with_the_offset_as_an_inner_margin(OverlayAnchor anchor, int x, int y)
     {
-        // Overlay 200x100, offset 10 px. Em âncoras da direita e de baixo o offset afasta da borda; no centro, desloca para direita/baixo.
+        // Overlay 200x100, offset 10 px. On right and bottom anchors the offset moves away from the edge; at center, it shifts right/down.
         var position = OverlayPlacement.Compute(anchor, 10, 10, Monitor, 200, 100);
 
         Assert.Equal((x, y), position);

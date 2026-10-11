@@ -21,7 +21,7 @@ public class PercentileTests
     [Fact]
     public void Ninety_nine_point_nine_of_one_to_thousand_is_nine_ninety_nine()
     {
-        // 99,9 * 1000 / 100 em ponto flutuante passa de 999 por erro de arredondamento; o resultado correto é o posto 999.
+        // 99.9 * 1000 / 100 in floating point exceeds 999 due to rounding error; the correct result is rank 999.
         Assert.Equal(999f, Percentile.NearestRank(Range(1000), 99.9));
     }
 

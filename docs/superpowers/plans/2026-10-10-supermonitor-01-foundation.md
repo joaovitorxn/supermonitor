@@ -1,36 +1,36 @@
-# Supermonitor Plano 1 — Fundação: Implementation Plan
+# Supermonitor Plan 1 — Foundation: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** App WinUI 3 funcional que roda como admin na bandeja e mostra um dashboard Overview com CPU, RAM, GPU, disco, rede e ping em tempo real, com custo mínimo de CPU.
+**Goal:** Functional WinUI 3 app that runs as admin in the tray and shows an Overview dashboard with real-time CPU, RAM, GPU, disk, network and ping, at minimal CPU cost.
 
-**Architecture:** `Supermonitor.Core` (sem UI) contém um `SensorHub` que chama provedores (`ISensorProvider`) em uma thread de fundo e grava valores `float` em ring buffers pré-alocados de uma `MetricStore`. O app WinUI 3 (`Supermonitor`) lê a store e desenha cards com gráficos Win2D. Ícone de bandeja, instância única, autostart e EcoQoS ficam no Core como Win32 puro.
+**Architecture:** `Supermonitor.Core` (no UI) contains a `SensorHub` that calls providers (`ISensorProvider`) on a background thread and writes `float` values into preallocated ring buffers of a `MetricStore`. The WinUI 3 app (`Supermonitor`) reads the store and draws cards with Win2D charts. Tray icon, single instance, autostart and EcoQoS live in Core as pure Win32.
 
-**Tech Stack:** .NET 10 (SDK 10.0.401), C# 14, Windows App SDK 2.x (pacotes de componente `Microsoft.WindowsAppSDK.WinUI` 2.3.9 + `Microsoft.WindowsAppSDK.Foundation` 2.3.12), Win2D 1.4.0, CommunityToolkit.Mvvm 8.4.2, xUnit v3 4.0.2, `Microsoft.Extensions.TimeProvider.Testing` 10.10.0. P/Invoke via `LibraryImport`.
+**Tech Stack:** .NET 10 (SDK 10.0.401), C# 14, Windows App SDK 2.x (component packages `Microsoft.WindowsAppSDK.WinUI` 2.3.9 + `Microsoft.WindowsAppSDK.Foundation` 2.3.12), Win2D 1.4.0, CommunityToolkit.Mvvm 8.4.2, xUnit v3 4.0.2, `Microsoft.Extensions.TimeProvider.Testing` 10.10.0. P/Invoke via `LibraryImport`.
 
 **Spec:** `docs/superpowers/specs/2026-10-10-supermonitor-design.md`
-**Índice:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
+**Index:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
 
 ## Global Constraints
 
-- Windows 11 apenas; `TargetFramework` `net10.0-windows10.0.22621.0`, `TargetPlatformMinVersion` `10.0.22000.0`, x64.
-- App unpackaged: `WindowsPackageType=None`, `WindowsAppSDKSelfContained=true`.
-- Manifest `requireAdministrator`. O exe não roda via `dotnet run` sem shell elevado; use `tools/run-elevated.ps1`.
-- Textos da UI em inglês (EN-US). Valor ausente sempre exibido como `N/A`.
-- Configurações em `%LocalAppData%\Supermonitor\settings.json`; logs em `%LocalAppData%\Supermonitor\logs`, 7 dias.
-- Nenhuma alocação por tick no caminho quente dos provedores (strings de id e handles criados no `Initialize`).
-- Falha de provedor nunca derruba o app: métrica vira `NaN` e o erro vai para o log.
-- Histórico: `MetricStore` com capacidade de 2400 amostras por métrica (10 min a 250 ms).
-- Testes de unidade: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`. Testes de hardware: `--filter "Category=Hardware"`.
-- Todo commit termina com a linha `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Windows 11 only; `TargetFramework` `net10.0-windows10.0.22621.0`, `TargetPlatformMinVersion` `10.0.22000.0`, x64.
+- Unpackaged app: `WindowsPackageType=None`, `WindowsAppSDKSelfContained=true`.
+- Manifest `requireAdministrator`. The exe does not run via `dotnet run` without an elevated shell; use `tools/run-elevated.ps1`.
+- UI text in English (EN-US). A missing value is always displayed as `N/A`.
+- Settings in `%LocalAppData%\Supermonitor\settings.json`; logs in `%LocalAppData%\Supermonitor\logs`, 7 days.
+- No per-tick allocation on the providers' hot path (id strings and handles created in `Initialize`).
+- A provider failure never takes the app down: the metric becomes `NaN` and the error goes to the log.
+- History: `MetricStore` with a capacity of 2400 samples per metric (10 min at 250 ms).
+- Unit tests: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`. Hardware tests: `--filter "Category=Hardware"`.
+- Every commit ends with the line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
 
-1. Arquivo de configurações com valores fora da faixa ou tipo errado (`"sampleIntervalMs": 7`, `"sampleIntervalMs": "fast"`, `"pingHost": ""`) → o app inicia com valores normalizados ou padrões, sem crash. Testes na Task 6.
-2. Instâncias de contadores que aparecem e somem (processos usando a GPU que encerram, contador de rede que zera, nomes malformados) → valores ignorados ou zerados, nunca exceção. Testes na Task 10 (`RateCalculator`) e Task 12 (`GpuEngineAggregator`).
-3. Segunda execução do exe com o app já aberto → ativa a janela existente e encerra, sem segundo processo. Testes na Task 13.
-4. Handler de `SampleReady` que lança exceção ou provedor que falha sempre → o hub continua amostrando os demais. Testes na Task 5.
-5. Máquina com adaptador de vídeo virtual (o PC do usuário tem "SudoMaker Virtual Display Adapter") ou GPU de software → só GPUs reais aparecem, com índice estável. Testes na Task 12 (`GpuAdapterFilter`).
+1. Settings file with out-of-range values or the wrong type (`"sampleIntervalMs": 7`, `"sampleIntervalMs": "fast"`, `"pingHost": ""`) → the app starts with normalized or default values, without crashing. Tests in Task 6.
+2. Counter instances that appear and disappear (processes using the GPU that exit, a network counter that resets, malformed names) → values ignored or zeroed, never an exception. Tests in Task 10 (`RateCalculator`) and Task 12 (`GpuEngineAggregator`).
+3. Second run of the exe with the app already open → activates the existing window and exits, no second process. Tests in Task 13.
+4. `SampleReady` handler that throws or a provider that always fails → the hub keeps sampling the others. Tests in Task 5.
+5. Machine with a virtual video adapter (the user's PC has "SudoMaker Virtual Display Adapter") or a software GPU → only real GPUs appear, with a stable index. Tests in Task 12 (`GpuAdapterFilter`).
 
 ---
 
@@ -42,12 +42,12 @@ global.json
 Directory.Build.props
 .gitignore
 tools/
-  make-icon.ps1                      Gera Assets/Supermonitor.ico
-  run-elevated.ps1                   Build + executa o app elevado
-  measure-cpu.ps1                    Mede CPU/RAM do processo
+  make-icon.ps1                      Generates Assets/Supermonitor.ico
+  run-elevated.ps1                   Build + runs the app elevated
+  measure-cpu.ps1                    Measures process CPU/RAM
 src/Supermonitor.Core/
   Supermonitor.Core.csproj
-  AppHost.cs                         Raiz de composição (settings, store, provedores, hub, ping)
+  AppHost.cs                         Composition root (settings, store, providers, hub, ping)
   Collections/RingBuffer.cs
   Diagnostics/Log.cs, LogRetention.cs
   Metrics/MetricUnit.cs              MetricUnit, MetricCategory, MetricDescriptor, MetricHandle
@@ -79,13 +79,13 @@ src/Supermonitor/
   Views/OverviewPage.xaml(.cs), SettingsPage.xaml(.cs)
 tests/Supermonitor.Tests/
   Supermonitor.Tests.csproj
-  (um arquivo de teste por unidade, listado em cada task)
+  (one test file per unit, listed in each task)
   Hardware/ProviderSmokeTests.cs
 ```
 
 ---
 
-### Task 1: Toolchain, solução e log
+### Task 1: Toolchain, solution and log
 
 **Files:**
 - Create: `global.json`, `Directory.Build.props`, `.gitignore`, `Supermonitor.slnx`
@@ -95,19 +95,19 @@ tests/Supermonitor.Tests/
 - Test: `tests/Supermonitor.Tests/Diagnostics/LogRetentionTests.cs`
 
 **Interfaces:**
-- Produces: `Supermonitor.Core.Diagnostics.Log` com `static void Initialize(string directory)`, `Info(string)`, `Warn(string, Exception? = null)`, `Error(string, Exception? = null)`. Antes de `Initialize`, todas as chamadas são no-op.
+- Produces: `Supermonitor.Core.Diagnostics.Log` with `static void Initialize(string directory)`, `Info(string)`, `Warn(string, Exception? = null)`, `Error(string, Exception? = null)`. Before `Initialize`, every call is a no-op.
 - Produces: `LogRetention.FilePrefix` (`"supermonitor-"`), `LogRetention.KeepDays` (7), `static IEnumerable<string> FilesToDelete(IEnumerable<string> fileNames, DateOnly today, int keepDays)`.
 
-- [ ] **Step 1: Instalar o .NET 10 SDK**
+- [ ] **Step 1: Install the .NET 10 SDK**
 
-Run (abre UAC; o usuário aprova):
+Run (opens UAC; the user approves):
 ```powershell
 winget install --id Microsoft.DotNet.SDK.10 --exact --accept-source-agreements --accept-package-agreements
 ```
-Depois, em um shell novo: `dotnet --list-sdks`
-Expected: linha começando com `10.0.401`.
+Then, in a new shell: `dotnet --list-sdks`
+Expected: line starting with `10.0.401`.
 
-- [ ] **Step 2: Criar arquivos da raiz**
+- [ ] **Step 2: Create root files**
 
 `global.json`:
 ```json
@@ -178,9 +178,9 @@ Run:
 dotnet new sln -n Supermonitor --format slnx
 dotnet sln Supermonitor.slnx add src/Supermonitor.Core/Supermonitor.Core.csproj tests/Supermonitor.Tests/Supermonitor.Tests.csproj
 ```
-Expected: `Supermonitor.slnx` com os dois projetos.
+Expected: `Supermonitor.slnx` with both projects.
 
-- [ ] **Step 3: Escrever o teste que falha**
+- [ ] **Step 3: Write the failing test**
 
 `tests/Supermonitor.Tests/Diagnostics/LogRetentionTests.cs`:
 ```csharp
@@ -209,12 +209,12 @@ public class LogRetentionTests
 }
 ```
 
-- [ ] **Step 4: Rodar e ver falhar**
+- [ ] **Step 4: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `The type or namespace name 'LogRetention' could not be found`.
+Expected: compile error `The type or namespace name 'LogRetention' could not be found`.
 
-- [ ] **Step 5: Implementar**
+- [ ] **Step 5: Implement**
 
 `src/Supermonitor.Core/Diagnostics/LogRetention.cs`:
 ```csharp
@@ -311,7 +311,7 @@ public static class Log
 }
 ```
 
-- [ ] **Step 6: Rodar e ver passar**
+- [ ] **Step 6: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
 Expected: `Passed: 1`.
@@ -332,9 +332,9 @@ git commit -m "build: scaffold solution with Core, tests and file logger"
 - Test: `tests/Supermonitor.Tests/Collections/RingBufferTests.cs`
 
 **Interfaces:**
-- Produces: `Supermonitor.Core.Collections.RingBuffer<T> where T : struct` com `RingBuffer(int capacity)`, `int Capacity`, `int Count`, `void Add(T)`, `T this[int index]` (0 = mais antigo), `T Latest`, `int CopyLast(Span<T> destination)` (copia os mais recentes em ordem cronológica, retorna quantidade), `void Clear()`. Não é thread-safe.
+- Produces: `Supermonitor.Core.Collections.RingBuffer<T> where T : struct` with `RingBuffer(int capacity)`, `int Capacity`, `int Count`, `void Add(T)`, `T this[int index]` (0 = oldest), `T Latest`, `int CopyLast(Span<T> destination)` (copies the most recent items in chronological order, returns the count), `void Clear()`. Not thread-safe.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Collections/RingBufferTests.cs`:
 ```csharp
@@ -432,12 +432,12 @@ public class RingBufferTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `RingBuffer<>` não encontrado.
+Expected: compile error `RingBuffer<>` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Collections/RingBuffer.cs`:
 ```csharp
@@ -510,7 +510,7 @@ public sealed class RingBuffer<T> where T : struct
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
 Expected: `Passed: 9`.
@@ -524,7 +524,7 @@ git commit -m "feat(core): add preallocated ring buffer"
 
 ---
 
-### Task 3: Modelo de métricas e formatação de unidades
+### Task 3: Metrics model and unit formatting
 
 **Files:**
 - Create: `src/Supermonitor.Core/Metrics/MetricUnit.cs`, `src/Supermonitor.Core/Metrics/MetricIds.cs`, `src/Supermonitor.Core/Metrics/UnitFormatter.cs`
@@ -535,10 +535,10 @@ git commit -m "feat(core): add preallocated ring buffer"
 - Produces: `enum MetricCategory { Cpu, Memory, Gpu, Disk, Network, Frame, System }`.
 - Produces: `sealed record MetricDescriptor(string Id, string DisplayName, MetricCategory Category, MetricUnit Unit)`.
 - Produces: `readonly record struct MetricHandle(int Index)`.
-- Produces: `MetricIds` (constantes e funções listadas no código abaixo).
-- Produces: `sealed record UnitOptions(bool NetworkInBits = false, bool Fahrenheit = false)` com `static UnitOptions Default`; `UnitFormatter.Format(double value, MetricUnit unit, UnitOptions options) -> string`.
+- Produces: `MetricIds` (constants and functions listed in the code below).
+- Produces: `sealed record UnitOptions(bool NetworkInBits = false, bool Fahrenheit = false)` with `static UnitOptions Default`; `UnitFormatter.Format(double value, MetricUnit unit, UnitOptions options) -> string`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Metrics/UnitFormatterTests.cs`:
 ```csharp
@@ -591,12 +591,12 @@ public class UnitFormatterTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `UnitFormatter` não encontrado.
+Expected: compile error `UnitFormatter` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Metrics/MetricUnit.cs`:
 ```csharp
@@ -770,10 +770,10 @@ public static class UnitFormatter
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam (`Passed: 28`).
+Expected: all pass (`Passed: 28`).
 
 - [ ] **Step 5: Commit**
 
@@ -792,9 +792,9 @@ git commit -m "feat(core): add metric model and unit formatter"
 
 **Interfaces:**
 - Consumes: `RingBuffer<float>` (Task 2), `MetricDescriptor`, `MetricHandle` (Task 3).
-- Produces: `MetricStore(int historyCapacity)`, `int HistoryCapacity`, `event Action? MetricsChanged` (dispara quando um id novo é registrado), `MetricHandle Register(MetricDescriptor descriptor, string owner)` (idempotente por id), `void Write(MetricHandle handle, float value)` (valor pendente), `void CommitTick()` (empurra o valor pendente de cada série; valor não reescrito é repetido), `void InvalidateOwner(string owner)` (pendente = NaN para as séries do dono), `IReadOnlyList<MetricDescriptor> GetDescriptors()`, `bool TryGetDescriptor(string id, out MetricDescriptor? descriptor)`, `float GetLatest(string id)` (NaN se desconhecido ou vazio), `int CopyHistory(string id, Span<float> destination)`. Thread-safe.
+- Produces: `MetricStore(int historyCapacity)`, `int HistoryCapacity`, `event Action? MetricsChanged` (fires when a new id is registered), `MetricHandle Register(MetricDescriptor descriptor, string owner)` (idempotent per id), `void Write(MetricHandle handle, float value)` (pending value), `void CommitTick()` (pushes each series' pending value; a value not rewritten is repeated), `void InvalidateOwner(string owner)` (pending = NaN for the owner's series), `IReadOnlyList<MetricDescriptor> GetDescriptors()`, `bool TryGetDescriptor(string id, out MetricDescriptor? descriptor)`, `float GetLatest(string id)` (NaN if unknown or empty), `int CopyHistory(string id, Span<float> destination)`. Thread-safe.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Metrics/MetricStoreTests.cs`:
 ```csharp
@@ -887,12 +887,12 @@ public class MetricStoreTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `MetricStore` não encontrado.
+Expected: compile error `MetricStore` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Metrics/MetricStore.cs`:
 ```csharp
@@ -1034,10 +1034,10 @@ public sealed class MetricStore
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1061,15 +1061,15 @@ git commit -m "feat(core): add thread-safe metric store with history"
   public interface ISensorProvider : IDisposable
   {
       string Name { get; }
-      TimeSpan MinInterval { get; }            // TimeSpan.Zero = todo tick
-      void Initialize(MetricStore store);      // registra métricas; exceção = indisponível
-      void Sample(MetricStore store, TimeSpan elapsed); // elapsed = desde a última amostra deste provedor; Zero na primeira
+      TimeSpan MinInterval { get; }            // TimeSpan.Zero = every tick
+      void Initialize(MetricStore store);      // registers metrics; exception = unavailable
+      void Sample(MetricStore store, TimeSpan elapsed); // elapsed = since this provider's last sample; Zero on the first
   }
   public sealed record ProviderStatus(string Name, bool IsAvailable, string? UnavailableReason);
   ```
-- Produces: `SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval)`, `const int MaxConsecutiveFailures = 5`, `event Action? SampleReady` (thread de fundo), `TimeSpan Interval { get; set; }` (mínimo 100 ms, efeito no próximo tick), `IReadOnlyList<ProviderStatus> GetStatuses()`, `void InitializeProviders()`, `void Start()`, `void Tick()`, `ValueTask DisposeAsync()`.
+- Produces: `SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval)`, `const int MaxConsecutiveFailures = 5`, `event Action? SampleReady` (background thread), `TimeSpan Interval { get; set; }` (minimum 100 ms, takes effect on the next tick), `IReadOnlyList<ProviderStatus> GetStatuses()`, `void InitializeProviders()`, `void Start()`, `void Tick()`, `ValueTask DisposeAsync()`.
 
-- [ ] **Step 1: Escrever o fake e os testes que falham**
+- [ ] **Step 1: Write the fake and the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/FakeProvider.cs`:
 ```csharp
@@ -1253,12 +1253,12 @@ public class SensorHubTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `ISensorProvider`/`SensorHub` não encontrados.
+Expected: compile error `ISensorProvider`/`SensorHub` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Sensors/ISensorProvider.cs`:
 ```csharp
@@ -1463,10 +1463,10 @@ public sealed class SensorHub : IAsyncDisposable
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1477,7 +1477,7 @@ git commit -m "feat(core): add sensor hub with failure isolation"
 
 ---
 
-### Task 6: Configurações
+### Task 6: Settings
 
 **Files:**
 - Create: `src/Supermonitor.Core/Settings/AppSettings.cs`, `SettingsMigrator.cs`, `SettingsJsonContext.cs`, `SettingsStore.cs`
@@ -1485,11 +1485,11 @@ git commit -m "feat(core): add sensor hub with failure isolation"
 
 **Interfaces:**
 - Consumes: `MetricIds` (Task 3), `Log` (Task 1).
-- Produces: `AppSettings` com propriedades `int Version`, `int SampleIntervalMs` (padrão 1000), `string PingHost` (padrão `"1.1.1.1"`), `bool StartMinimized`, `List<string> OverviewCards`; `static IReadOnlyList<int> AllowedIntervalsMs` = `[250, 500, 1000, 2000]`; `static IReadOnlyList<string> DefaultOverviewCards`; `void Normalize()`.
+- Produces: `AppSettings` with properties `int Version`, `int SampleIntervalMs` (default 1000), `string PingHost` (default `"1.1.1.1"`), `bool StartMinimized`, `List<string> OverviewCards`; `static IReadOnlyList<int> AllowedIntervalsMs` = `[250, 500, 1000, 2000]`; `static IReadOnlyList<string> DefaultOverviewCards`; `void Normalize()`.
 - Produces: `SettingsMigrator.CurrentVersion` (1), `static JsonObject Migrate(JsonObject root)`.
 - Produces: `enum SettingsLoadResult { Loaded, CreatedDefault, RecoveredFromCorrupt }`; `SettingsStore(string filePath, TimeProvider time, TimeSpan debounce)`, `AppSettings Current`, `SettingsLoadResult Load()`, `void RequestSave()`, `void Flush()`, `void Dispose()`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Settings/AppSettingsTests.cs`:
 ```csharp
@@ -1632,12 +1632,12 @@ public sealed class SettingsStoreTests : IDisposable
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `AppSettings`/`SettingsStore` não encontrados.
+Expected: compile error `AppSettings`/`SettingsStore` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Settings/AppSettings.cs`:
 ```csharp
@@ -1702,7 +1702,7 @@ public static class SettingsMigrator
         var version = root["version"]?.GetValue<int>() ?? 0;
         if (version < 1)
         {
-            // v0: arquivos sem número de versão. Nenhum campo mudou.
+            // v0: files without a version number. No field changed.
             root["version"] = 1;
         }
 
@@ -1827,10 +1827,10 @@ public sealed class SettingsStore : IDisposable
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1841,7 +1841,7 @@ git commit -m "feat(core): add settings store with migration, debounce and corru
 
 ---
 
-### Task 7: PDH e provedor de CPU
+### Task 7: PDH and CPU provider
 
 **Files:**
 - Create: `src/Supermonitor.Core/Interop/Pdh.cs`, `src/Supermonitor.Core/Sensors/Pdh/PdhQuery.cs`
@@ -1850,10 +1850,10 @@ git commit -m "feat(core): add settings store with migration, debounce and corru
 
 **Interfaces:**
 - Consumes: `ISensorProvider`, `MetricStore`, `MetricIds`.
-- Produces: `PdhQuery` (`AddCounter(string englishPath) -> PdhCounter`, `Collect()`, `Dispose()`), `PdhCounter` (`double GetValue()` → NaN se inválido, `PdhArray GetArray()`), `ref struct PdhArray` (`int Count`, `ReadOnlySpan<char> NameAt(int)`, `double ValueAt(int)` → NaN se inválido), `PdhException(string operation, uint status)`.
-- Produces: `CpuInstanceName.TryParse(ReadOnlySpan<char> name, out int key)` (`key = group * 1024 + number`), `CpuProvider` (métricas `cpu.usage`, `cpu.core{i}.usage`).
+- Produces: `PdhQuery` (`AddCounter(string englishPath) -> PdhCounter`, `Collect()`, `Dispose()`), `PdhCounter` (`double GetValue()` → NaN if invalid, `PdhArray GetArray()`), `ref struct PdhArray` (`int Count`, `ReadOnlySpan<char> NameAt(int)`, `double ValueAt(int)` → NaN if invalid), `PdhException(string operation, uint status)`.
+- Produces: `CpuInstanceName.TryParse(ReadOnlySpan<char> name, out int key)` (`key = group * 1024 + number`), `CpuProvider` (metrics `cpu.usage`, `cpu.core{i}.usage`).
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/CpuInstanceNameTests.cs`:
 ```csharp
@@ -1923,12 +1923,12 @@ public class ProviderSmokeTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `CpuInstanceName`/`CpuProvider` não encontrados.
+Expected: compile error `CpuInstanceName`/`CpuProvider` not found.
 
-- [ ] **Step 3: Implementar interop e wrapper PDH**
+- [ ] **Step 3: Implement interop and PDH wrapper**
 
 `src/Supermonitor.Core/Interop/Pdh.cs`:
 ```csharp
@@ -2097,7 +2097,7 @@ public readonly unsafe ref struct PdhArray
 }
 ```
 
-- [ ] **Step 4: Implementar CPU**
+- [ ] **Step 4: Implement CPU**
 
 `src/Supermonitor.Core/Sensors/Cpu/CpuInstanceName.cs`:
 ```csharp
@@ -2107,7 +2107,7 @@ namespace Supermonitor.Core.Sensors.Cpu;
 
 public static class CpuInstanceName
 {
-    // Instâncias de "Processor Information": "grupo,núcleo" (ex.: "0,7"), "0,_Total", "_Total".
+    // "Processor Information" instances: "group,core" (e.g. "0,7"), "0,_Total", "_Total".
     public static bool TryParse(ReadOnlySpan<char> name, out int key)
     {
         key = 0;
@@ -2196,13 +2196,13 @@ public sealed class CpuProvider : ISensorProvider
 }
 ```
 
-- [ ] **Step 5: Rodar unitários e hardware**
+- [ ] **Step 5: Run unit and hardware tests**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam.
+Expected: all pass.
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"`
-Expected: `Cpu_provider_reports_total_and_per_core_usage` passa (16 núcleos lógicos no 7800X3D).
+Expected: `Cpu_provider_reports_total_and_per_core_usage` passes (16 logical cores on the 7800X3D).
 
 - [ ] **Step 6: Commit**
 
@@ -2213,20 +2213,20 @@ git commit -m "feat(sensors): add PDH wrapper and CPU provider"
 
 ---
 
-### Task 8: Provedor de memória e privilégios
+### Task 8: Memory provider and privileges
 
 **Files:**
 - Create: `src/Supermonitor.Core/Interop/Kernel32.cs`, `Psapi.cs`, `Ntdll.cs`
 - Create: `src/Supermonitor.Core/Shell/Privileges.cs`
 - Create: `src/Supermonitor.Core/Sensors/Memory/MemoryProvider.cs`
-- Test: `tests/Supermonitor.Tests/Interop/StructLayoutTests.cs`; modificar `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
+- Test: `tests/Supermonitor.Tests/Interop/StructLayoutTests.cs`; modify `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
 
 **Interfaces:**
 - Produces: `Privileges.ProfileSingleProcess` (`"SeProfileSingleProcessPrivilege"`), `static bool Privileges.TryEnable(string name)`.
-- Produces: `Kernel32` (internal) com `GlobalMemoryStatusEx`, `GetCurrentProcess`, `CloseHandle`, `GetModuleHandleW`, `SetProcessInformation`, `SetPriorityClass` — usados também nas Tasks 13 e 14.
-- Produces: `MemoryProvider` com métricas `mem.total`, `mem.used`, `mem.available`, `mem.usage`, `mem.standby`, `mem.free`, `mem.modified`, `mem.commit`, `mem.commitlimit`, `mem.cache`. Standby/free/modified exigem admin + privilégio; sem eles ficam NaN.
+- Produces: `Kernel32` (internal) with `GlobalMemoryStatusEx`, `GetCurrentProcess`, `CloseHandle`, `GetModuleHandleW`, `SetProcessInformation`, `SetPriorityClass` — also used in Tasks 13 and 14.
+- Produces: `MemoryProvider` with metrics `mem.total`, `mem.used`, `mem.available`, `mem.usage`, `mem.standby`, `mem.free`, `mem.modified`, `mem.commit`, `mem.commitlimit`, `mem.cache`. Standby/free/modified require admin + privilege; without them they stay NaN.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Interop/StructLayoutTests.cs`:
 ```csharp
@@ -2247,7 +2247,7 @@ public class StructLayoutTests
 }
 ```
 
-Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Memory;` no topo):
+Add to `ProviderSmokeTests` (and `using Supermonitor.Core.Sensors.Memory;` at the top):
 ```csharp
     [Fact]
     public void Memory_provider_reports_total_and_used()
@@ -2263,12 +2263,12 @@ Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Memory;` n
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `Kernel32` não encontrado.
+Expected: compile error `Kernel32` not found.
 
-- [ ] **Step 3: Implementar interop**
+- [ ] **Step 3: Implement interop**
 
 `src/Supermonitor.Core/Interop/Kernel32.cs`:
 ```csharp
@@ -2440,7 +2440,7 @@ public static unsafe partial class Privileges
                 return false;
             }
 
-            // ERROR_NOT_ALL_ASSIGNED (1300): o token não tem o privilégio (app sem elevação).
+            // ERROR_NOT_ALL_ASSIGNED (1300): the token does not have the privilege (app not elevated).
             return Marshal.GetLastPInvokeError() == 0;
         }
         finally
@@ -2469,7 +2469,7 @@ public static unsafe partial class Privileges
 }
 ```
 
-- [ ] **Step 4: Implementar o provedor**
+- [ ] **Step 4: Implement the provider**
 
 `src/Supermonitor.Core/Sensors/Memory/MemoryProvider.cs`:
 ```csharp
@@ -2571,10 +2571,10 @@ public sealed unsafe class MemoryProvider : ISensorProvider
 }
 ```
 
-- [ ] **Step 5: Rodar unitários e hardware**
+- [ ] **Step 5: Run unit and hardware tests**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam.
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → os dois testes de hardware passam.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → both hardware tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -2585,17 +2585,17 @@ git commit -m "feat(sensors): add memory provider with standby/free/modified lis
 
 ---
 
-### Task 9: Provedores de disco e espaço
+### Task 9: Disk and space providers
 
 **Files:**
 - Create: `src/Supermonitor.Core/Sensors/Disk/DiskInstanceName.cs`, `DiskProvider.cs`, `DriveSpaceProvider.cs`
-- Test: `tests/Supermonitor.Tests/Sensors/DiskInstanceNameTests.cs`; modificar `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
+- Test: `tests/Supermonitor.Tests/Sensors/DiskInstanceNameTests.cs`; modify `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
 
 **Interfaces:**
 - Consumes: `PdhQuery`, `PdhCounter`, `PdhArray` (Task 7).
-- Produces: `DiskInstanceName.TryParse(ReadOnlySpan<char> name, out int index, out ReadOnlySpan<char> label)`; `DiskProvider` (`disk{n}.read`, `disk{n}.write`, `disk{n}.active`, `disk{n}.queue`); `DriveSpaceProvider` (`MinInterval` 5 s; `drive.{L}.free`, `drive.{L}.total`, `drive.{L}.usage`, registra drives novos quando aparecem).
+- Produces: `DiskInstanceName.TryParse(ReadOnlySpan<char> name, out int index, out ReadOnlySpan<char> label)`; `DiskProvider` (`disk{n}.read`, `disk{n}.write`, `disk{n}.active`, `disk{n}.queue`); `DriveSpaceProvider` (`MinInterval` 5 s; `drive.{L}.free`, `drive.{L}.total`, `drive.{L}.usage`, registers new drives when they appear).
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/DiskInstanceNameTests.cs`:
 ```csharp
@@ -2627,7 +2627,7 @@ public class DiskInstanceNameTests
 }
 ```
 
-Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Disk;`):
+Add to `ProviderSmokeTests` (and `using Supermonitor.Core.Sensors.Disk;`):
 ```csharp
     [Fact]
     public void Disk_provider_reports_activity_for_disk_zero()
@@ -2651,12 +2651,12 @@ Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Disk;`):
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `DiskInstanceName` não encontrado.
+Expected: compile error `DiskInstanceName` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Sensors/Disk/DiskInstanceName.cs`:
 ```csharp
@@ -2666,7 +2666,7 @@ namespace Supermonitor.Core.Sensors.Disk;
 
 public static class DiskInstanceName
 {
-    // Instâncias de "PhysicalDisk": "0 C:", "1 D: E:", "_Total".
+    // "PhysicalDisk" instances: "0 C:", "1 D: E:", "_Total".
     public static bool TryParse(ReadOnlySpan<char> name, out int index, out ReadOnlySpan<char> label)
     {
         label = default;
@@ -2836,10 +2836,10 @@ public sealed class DriveSpaceProvider : ISensorProvider
 }
 ```
 
-- [ ] **Step 4: Rodar unitários e hardware**
+- [ ] **Step 4: Run unit and hardware tests**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam.
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → todos passam.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -2850,19 +2850,19 @@ git commit -m "feat(sensors): add disk activity and drive space providers"
 
 ---
 
-### Task 10: Provedor de rede
+### Task 10: Network provider
 
 **Files:**
 - Create: `src/Supermonitor.Core/Interop/Iphlpapi.cs`
 - Create: `src/Supermonitor.Core/Sensors/Network/RateCalculator.cs`, `NetworkAdapterFilter.cs`, `NetworkProvider.cs`
-- Test: `tests/Supermonitor.Tests/Sensors/RateCalculatorTests.cs`, `tests/Supermonitor.Tests/Sensors/NetworkAdapterFilterTests.cs`; modificar `StructLayoutTests.cs` e `ProviderSmokeTests.cs`
+- Test: `tests/Supermonitor.Tests/Sensors/RateCalculatorTests.cs`, `tests/Supermonitor.Tests/Sensors/NetworkAdapterFilterTests.cs`; modify `StructLayoutTests.cs` and `ProviderSmokeTests.cs`
 
 **Interfaces:**
-- Produces: `RateCalculator.PerSecond(ulong previous, ulong current, TimeSpan elapsed) -> double` (NaN se `elapsed <= 0`; 0 se contador voltou).
+- Produces: `RateCalculator.PerSecond(ulong previous, ulong current, TimeSpan elapsed) -> double` (NaN if `elapsed <= 0`; 0 if the counter went backwards).
 - Produces: `NetworkAdapterFilter.IsMonitored(uint ifType, int operStatus, byte flags) -> bool`.
 - Produces: `NetworkProvider` (`net{n}.down`, `net{n}.up`, `net.down`, `net.up`).
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/RateCalculatorTests.cs`:
 ```csharp
@@ -2923,12 +2923,12 @@ public class NetworkAdapterFilterTests
 }
 ```
 
-Adicionar ao teste `Native_memory_structs_match_x64_sizes` em `StructLayoutTests.cs`:
+Add to the test `Native_memory_structs_match_x64_sizes` in `StructLayoutTests.cs`:
 ```csharp
         Assert.Equal(1352, Unsafe.SizeOf<Iphlpapi.MIB_IF_ROW2>());
 ```
 
-Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Network;`):
+Add to `ProviderSmokeTests` (and `using Supermonitor.Core.Sensors.Network;`):
 ```csharp
     [Fact]
     public void Network_provider_reports_totals()
@@ -2941,12 +2941,12 @@ Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Network;`)
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `RateCalculator`/`Iphlpapi` não encontrados.
+Expected: compile error `RateCalculator`/`Iphlpapi` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Interop/Iphlpapi.cs`:
 ```csharp
@@ -3183,10 +3183,10 @@ public sealed unsafe class NetworkProvider : ISensorProvider
 }
 ```
 
-- [ ] **Step 4: Rodar unitários e hardware**
+- [ ] **Step 4: Run unit and hardware tests**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam (inclui `MIB_IF_ROW2` = 1352).
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → todos passam.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass (includes `MIB_IF_ROW2` = 1352).
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -3205,10 +3205,10 @@ git commit -m "feat(sensors): add network throughput provider"
 
 **Interfaces:**
 - Consumes: `RingBuffer<float>` (Task 2).
-- Produces: `readonly record struct PingSnapshot(double LatencyMs, double JitterMs, double LossPercent)`; `PingStatistics(int window)` com `AddReply(double ms)`, `AddLoss()`, `PingSnapshot GetSnapshot()`. Latência = última amostra (NaN se a última foi perda); jitter = média das diferenças absolutas entre respostas consecutivas; perda = % de perdas na janela.
-- Produces: `PingMonitor(Func<string> host, TimeSpan period)` com `Start()`, `PingSnapshot Snapshot`, `Dispose()`; `PingProvider(PingMonitor monitor)` (`net.ping`, `net.jitter`, `net.loss`).
+- Produces: `readonly record struct PingSnapshot(double LatencyMs, double JitterMs, double LossPercent)`; `PingStatistics(int window)` with `AddReply(double ms)`, `AddLoss()`, `PingSnapshot GetSnapshot()`. Latency = last sample (NaN if the last one was a loss); jitter = mean of the absolute differences between consecutive replies; loss = % of losses in the window.
+- Produces: `PingMonitor(Func<string> host, TimeSpan period)` with `Start()`, `PingSnapshot Snapshot`, `Dispose()`; `PingProvider(PingMonitor monitor)` (`net.ping`, `net.jitter`, `net.loss`).
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/PingStatisticsTests.cs`:
 ```csharp
@@ -3284,12 +3284,12 @@ public class PingStatisticsTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `PingStatistics` não encontrado.
+Expected: compile error `PingStatistics` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Sensors/Network/PingStatistics.cs`:
 ```csharp
@@ -3464,9 +3464,9 @@ public sealed class PingProvider(PingMonitor monitor) : ISensorProvider
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -3477,20 +3477,20 @@ git commit -m "feat(sensors): add ping latency, jitter and loss"
 
 ---
 
-### Task 12: Provedor de GPU (PDH + DXGI)
+### Task 12: GPU provider (PDH + DXGI)
 
 **Files:**
 - Create: `src/Supermonitor.Core/Interop/Dxgi.cs`
 - Create: `src/Supermonitor.Core/Sensors/Gpu/GpuAdapterInfo.cs`, `GpuEngineAggregator.cs`, `GpuProvider.cs`
-- Test: `tests/Supermonitor.Tests/Sensors/GpuEngineAggregatorTests.cs`, `tests/Supermonitor.Tests/Sensors/GpuAdapterFilterTests.cs`; modificar `StructLayoutTests.cs` e `ProviderSmokeTests.cs`
+- Test: `tests/Supermonitor.Tests/Sensors/GpuEngineAggregatorTests.cs`, `tests/Supermonitor.Tests/Sensors/GpuAdapterFilterTests.cs`; modify `StructLayoutTests.cs` and `ProviderSmokeTests.cs`
 
 **Interfaces:**
 - Consumes: `PdhQuery`/`PdhArray` (Task 7).
-- Produces: `sealed record GpuAdapterInfo(string Name, uint LuidLow, int LuidHigh, ulong DedicatedVideoMemory, uint Flags)` com `string PdhLuid` (`"0x{High:X8}_0x{Low:X8}"`); `GpuAdapterFilter.IsMonitored(uint flags, ulong dedicatedVideoMemory)`; `DxgiAdapters.Enumerate() -> IReadOnlyList<GpuAdapterInfo>`.
-- Produces: `enum GpuEngineKind { Other, ThreeD, Copy, VideoDecode, VideoEncode, Compute }`; `readonly record struct GpuUsage(float Total, float ThreeD, float Copy, float VideoDecode, float VideoEncode, float Compute)`; `GpuEngineAggregator(IReadOnlyList<string> adapterLuids)` com `Reset()`, `Add(ReadOnlySpan<char> instanceName, double value)`, `GpuUsage GetUsage(int adapter)`. Uso por engine = soma entre processos; por tipo = máximo entre engines do tipo; total = máximo entre engines (igual ao Gerenciador de Tarefas); limitado a 100.
+- Produces: `sealed record GpuAdapterInfo(string Name, uint LuidLow, int LuidHigh, ulong DedicatedVideoMemory, uint Flags)` with `string PdhLuid` (`"0x{High:X8}_0x{Low:X8}"`); `GpuAdapterFilter.IsMonitored(uint flags, ulong dedicatedVideoMemory)`; `DxgiAdapters.Enumerate() -> IReadOnlyList<GpuAdapterInfo>`.
+- Produces: `enum GpuEngineKind { Other, ThreeD, Copy, VideoDecode, VideoEncode, Compute }`; `readonly record struct GpuUsage(float Total, float ThreeD, float Copy, float VideoDecode, float VideoEncode, float Compute)`; `GpuEngineAggregator(IReadOnlyList<string> adapterLuids)` with `Reset()`, `Add(ReadOnlySpan<char> instanceName, double value)`, `GpuUsage GetUsage(int adapter)`. Usage per engine = sum across processes; per kind = maximum across engines of that kind; total = maximum across engines (same as Task Manager); capped at 100.
 - Produces: `GpuProvider` (`gpu{n}.usage`, `.3d`, `.copy`, `.decode`, `.encode`, `.compute`, `.vram.used`, `.vram.total`, `.shared.used`).
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Sensors/GpuEngineAggregatorTests.cs`:
 ```csharp
@@ -3596,12 +3596,12 @@ public class GpuAdapterFilterTests
 }
 ```
 
-Adicionar ao teste em `StructLayoutTests.cs`:
+Add to the test in `StructLayoutTests.cs`:
 ```csharp
         Assert.Equal(312, Unsafe.SizeOf<Dxgi.DXGI_ADAPTER_DESC1>());
 ```
 
-Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Gpu;`):
+Add to `ProviderSmokeTests` (and `using Supermonitor.Core.Sensors.Gpu;`):
 ```csharp
     [Fact]
     public void Gpu_provider_reports_usage_and_vram_for_first_gpu()
@@ -3615,12 +3615,12 @@ Adicionar em `ProviderSmokeTests` (e `using Supermonitor.Core.Sensors.Gpu;`):
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `GpuEngineAggregator` não encontrado.
+Expected: compile error `GpuEngineAggregator` not found.
 
-- [ ] **Step 3: Implementar DXGI**
+- [ ] **Step 3: Implement DXGI**
 
 `src/Supermonitor.Core/Interop/Dxgi.cs`:
 ```csharp
@@ -3654,7 +3654,7 @@ internal static unsafe partial class Dxgi
     [LibraryImport("dxgi.dll")]
     public static partial int CreateDXGIFactory1(Guid* riid, void** factory);
 
-    // Índices da vtable: IUnknown (0-2), IDXGIObject (3-6), IDXGIFactory (7-11), IDXGIFactory1.EnumAdapters1 = 12.
+    // vtable indices: IUnknown (0-2), IDXGIObject (3-6), IDXGIFactory (7-11), IDXGIFactory1.EnumAdapters1 = 12.
     public static int EnumAdapters1(void* factory, uint index, void** adapter) =>
         ((delegate* unmanaged<void*, uint, void**, int>)(*(void***)factory)[12])(factory, index, adapter);
 
@@ -3733,7 +3733,7 @@ public static unsafe class DxgiAdapters
 }
 ```
 
-- [ ] **Step 4: Implementar agregador e provedor**
+- [ ] **Step 4: Implement aggregator and provider**
 
 `src/Supermonitor.Core/Sensors/Gpu/GpuEngineAggregator.cs`:
 ```csharp
@@ -3770,7 +3770,7 @@ public sealed class GpuEngineAggregator
 
     public void Reset() => Array.Clear(_sums);
 
-    // Formato: "pid_1234_luid_0x00000000_0x0000D1F2_phys_0_eng_0_engtype_3D".
+    // Format: "pid_1234_luid_0x00000000_0x0000D1F2_phys_0_eng_0_engtype_3D".
     public void Add(ReadOnlySpan<char> instanceName, double value)
     {
         if (!double.IsFinite(value) || !TryParse(instanceName, out var luid, out var engine, out var engineType))
@@ -4025,10 +4025,10 @@ public sealed class GpuProvider : ISensorProvider
 }
 ```
 
-- [ ] **Step 5: Rodar unitários e hardware**
+- [ ] **Step 5: Run unit and hardware tests**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam.
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → todos passam; GPU 0 é a RX 9070 XT (o adaptador virtual SudoMaker fica de fora).
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category=Hardware"` → all pass; GPU 0 is the RX 9070 XT (the virtual SudoMaker adapter is left out).
 
 - [ ] **Step 6: Commit**
 
@@ -4039,7 +4039,7 @@ git commit -m "feat(sensors): add GPU engine and memory provider"
 
 ---
 
-### Task 13: Utilitários de shell e composição
+### Task 13: Shell utilities and composition
 
 **Files:**
 - Create: `src/Supermonitor.Core/Shell/AppPaths.cs`, `SingleInstance.cs`, `AutostartManager.cs`, `ProcessEfficiency.cs`
@@ -4047,14 +4047,14 @@ git commit -m "feat(sensors): add GPU engine and memory provider"
 - Test: `tests/Supermonitor.Tests/Shell/SingleInstanceTests.cs`, `tests/Supermonitor.Tests/Shell/AutostartManagerTests.cs`
 
 **Interfaces:**
-- Consumes: tudo das Tasks 1–12; `Kernel32.SetProcessInformation`, `SetPriorityClass`, `GetCurrentProcess` (Task 8).
+- Consumes: everything from Tasks 1–12; `Kernel32.SetProcessInformation`, `SetPriorityClass`, `GetCurrentProcess` (Task 8).
 - Produces: `AppPaths.DataDirectory`, `LogDirectory`, `SettingsFile`, `IconPath`.
-- Produces: `sealed record SingleInstanceNames(string Mutex, string ActivateEvent)` com `Default`; `SingleInstance.TryAcquire(SingleInstanceNames) -> SingleInstance?`, `static void SignalExisting(SingleInstanceNames)`, `void ListenForActivation(Action onActivate)`, `Dispose()` (no mesmo thread que adquiriu).
+- Produces: `sealed record SingleInstanceNames(string Mutex, string ActivateEvent)` with `Default`; `SingleInstance.TryAcquire(SingleInstanceNames) -> SingleInstance?`, `static void SignalExisting(SingleInstanceNames)`, `void ListenForActivation(Action onActivate)`, `Dispose()` (on the same thread that acquired it).
 - Produces: `AutostartManager.TaskName` (`"Supermonitor"`), `static string BuildTaskXml(string exePath, string userId)`, `static bool IsEnabled()`, `static void SetEnabled(bool enabled, string exePath)`.
-- Produces: `ProcessEfficiency.SetEfficiencyMode(bool enabled) -> bool` (EcoQoS + BELOW_NORMAL quando ligado; NORMAL quando desligado).
-- Produces: `AppHost` com `static AppHost Create()`, `SettingsStore Settings`, `SettingsLoadResult SettingsLoadResult`, `MetricStore Metrics`, `SensorHub Hub`, `void Start()`, `ValueTask DisposeAsync()`.
+- Produces: `ProcessEfficiency.SetEfficiencyMode(bool enabled) -> bool` (EcoQoS + BELOW_NORMAL when on; NORMAL when off).
+- Produces: `AppHost` with `static AppHost Create()`, `SettingsStore Settings`, `SettingsLoadResult SettingsLoadResult`, `MetricStore Metrics`, `SensorHub Hub`, `void Start()`, `ValueTask DisposeAsync()`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [ ] **Step 1: Write the failing tests**
 
 `tests/Supermonitor.Tests/Shell/SingleInstanceTests.cs`:
 ```csharp
@@ -4139,12 +4139,12 @@ public class AutostartManagerTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `SingleInstance`/`AutostartManager` não encontrados.
+Expected: compile error `SingleInstance`/`AutostartManager` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Shell/AppPaths.cs`:
 ```csharp
@@ -4416,9 +4416,9 @@ public sealed class AppHost : IAsyncDisposable
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → todos passam.
+Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -4429,33 +4429,33 @@ git commit -m "feat(core): add single instance, autostart task, efficiency mode 
 
 ---
 
-### Task 14: Shell WinUI 3 com bandeja
+### Task 14: WinUI 3 shell with tray
 
 **Files:**
 - Create: `src/Supermonitor.Core/Interop/User32.cs`, `src/Supermonitor.Core/Interop/Shell32.cs`
 - Create: `src/Supermonitor.Core/Shell/HiddenWindow.cs`, `TrayIcon.cs`, `WindowActivation.cs`
 - Create: `tools/make-icon.ps1`, `tools/run-elevated.ps1`
-- Create: `src/Supermonitor/Supermonitor.csproj`, `app.manifest`, `Program.cs`, `App.xaml`, `App.xaml.cs`, `MainWindow.xaml`, `MainWindow.xaml.cs`, `ViewModels/PageContext.cs`, `Assets/Supermonitor.ico` (gerado)
-- Test: `tests/Supermonitor.Tests/Interop/StructLayoutTests.cs` (modificar)
+- Create: `src/Supermonitor/Supermonitor.csproj`, `app.manifest`, `Program.cs`, `App.xaml`, `App.xaml.cs`, `MainWindow.xaml`, `MainWindow.xaml.cs`, `ViewModels/PageContext.cs`, `Assets/Supermonitor.ico` (generated)
+- Test: `tests/Supermonitor.Tests/Interop/StructLayoutTests.cs` (modify)
 
 **Interfaces:**
 - Consumes: `AppHost`, `SingleInstance`, `ProcessEfficiency`, `AppPaths` (Task 13).
-- Produces: `HiddenWindow(string className, Func<uint, nint, nint, nint?> handler)` com `nint Handle`, `Dispose()`. O handler devolve `null` para delegar a `DefWindowProcW`.
-- Produces: `TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit)` com `Dispose()`. Deve ser criado no thread de UI.
+- Produces: `HiddenWindow(string className, Func<uint, nint, nint, nint?> handler)` with `nint Handle`, `Dispose()`. The handler returns `null` to delegate to `DefWindowProcW`.
+- Produces: `TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit)` with `Dispose()`. Must be created on the UI thread.
 - Produces: `WindowActivation.ForceForeground(nint hwnd)`.
 - Produces: `sealed record PageContext(AppHost Host, Func<bool> IsMinimized)` (namespace `Supermonitor.ViewModels`).
-- Produces: `MainWindow(AppHost host)` com `bool IsMinimized`, `void BringToFront()`. NavigationView com item `overview` e Settings; as páginas entram nas Tasks 15 e 16.
+- Produces: `MainWindow(AppHost host)` with `bool IsMinimized`, `void BringToFront()`. NavigationView with an `overview` item and Settings; the pages come in Tasks 15 and 16.
 
-- [ ] **Step 1: Teste de layout das structs nativas (falha)**
+- [ ] **Step 1: Native struct layout test (fails)**
 
-Adicionar ao teste em `StructLayoutTests.cs`:
+Add to the test in `StructLayoutTests.cs`:
 ```csharp
         Assert.Equal(976, Unsafe.SizeOf<Shell32.NOTIFYICONDATAW>());
         Assert.Equal(80, Unsafe.SizeOf<User32.WNDCLASSEXW>());
 ```
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: erro de compilação `Shell32`/`User32` não encontrados.
+Expected: compile error `Shell32`/`User32` not found.
 
 - [ ] **Step 2: Interop Win32**
 
@@ -4614,7 +4614,7 @@ internal static unsafe partial class Shell32
 ```
 
 Run: `dotnet test tests/Supermonitor.Tests --filter "Category!=Hardware"`
-Expected: todos passam (976 e 80 bytes).
+Expected: all pass (976 and 80 bytes).
 
 - [ ] **Step 3: HiddenWindow, TrayIcon, WindowActivation**
 
@@ -4821,7 +4821,7 @@ public static class WindowActivation
 }
 ```
 
-- [ ] **Step 4: Ícone e scripts**
+- [ ] **Step 4: Icon and scripts**
 
 `tools/make-icon.ps1`:
 ```powershell
@@ -4891,7 +4891,7 @@ Start-Process $exe.FullName -Verb RunAs
 Run: `pwsh tools/make-icon.ps1`
 Expected: `Icon written to …\src\Supermonitor\Assets\Supermonitor.ico`.
 
-- [ ] **Step 5: Projeto WinUI**
+- [ ] **Step 5: WinUI project**
 
 `src/Supermonitor/Supermonitor.csproj`:
 ```xml
@@ -5151,7 +5151,7 @@ public sealed record PageContext(AppHost Host, Func<bool> IsMinimized);
 </Window>
 ```
 
-`src/Supermonitor/MainWindow.xaml.cs` (nesta task a navegação ainda não tem páginas; as Tasks 15 e 16 preenchem `Navigate`):
+`src/Supermonitor/MainWindow.xaml.cs` (in this task the navigation has no pages yet; Tasks 15 and 16 fill in `Navigate`):
 ```csharp
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -5215,12 +5215,12 @@ public sealed partial class MainWindow : Window
 
     private void Navigate(string? tag, PageContext context)
     {
-        // Páginas adicionadas nas Tasks 15 (overview) e 16 (settings).
+        // Pages added in Tasks 15 (overview) and 16 (settings).
     }
 }
 ```
 
-Adicionar o projeto à solução:
+Add the project to the solution:
 ```powershell
 dotnet sln Supermonitor.slnx add src/Supermonitor/Supermonitor.csproj
 ```
@@ -5230,18 +5230,18 @@ dotnet sln Supermonitor.slnx add src/Supermonitor/Supermonitor.csproj
 Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64`
 Expected: `Build succeeded`.
 
-Se o restore/build falhar com erro sobre targets ou runtime do Windows App SDK nos pacotes de componente, troque as duas referências `Microsoft.WindowsAppSDK.WinUI` e `Microsoft.WindowsAppSDK.Foundation` por `<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />` e rode o build de novo. Registre a troca na mensagem de commit.
+If restore/build fails with an error about Windows App SDK targets or runtime in the component packages, replace the two references `Microsoft.WindowsAppSDK.WinUI` and `Microsoft.WindowsAppSDK.Foundation` with `<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />` and run the build again. Record the swap in the commit message.
 
-- [ ] **Step 7: Rodar e verificar manualmente**
+- [ ] **Step 7: Run and verify manually**
 
-Run: `pwsh tools/run-elevated.ps1 -NoBuild` (o usuário aprova o UAC).
+Run: `pwsh tools/run-elevated.ps1 -NoBuild` (the user approves the UAC).
 Expected:
-1. Janela "Supermonitor" com Mica, barra de título própria e NavigationView com "Overview" e "Settings" (conteúdo vazio).
-2. Ícone na bandeja. Clique esquerdo traz a janela. Clique direito mostra "Open Supermonitor" / "Exit".
-3. Fechar a janela no X: o processo continua (Gerenciador de Tarefas mostra Supermonitor com folha de "Modo de eficiência").
-4. Rodar `pwsh tools/run-elevated.ps1 -NoBuild` de novo: a janela existente volta; nenhum segundo processo.
-5. "Exit" na bandeja encerra o processo.
-6. `%LocalAppData%\Supermonitor\logs\supermonitor-AAAAMMDD.log` contém "Supermonitor starting" e "Supermonitor stopped".
+1. "Supermonitor" window with Mica, custom title bar and a NavigationView with "Overview" and "Settings" (empty content).
+2. Tray icon. Left click brings up the window. Right click shows "Open Supermonitor" / "Exit".
+3. Closing the window with the X: the process keeps running (Task Manager shows Supermonitor with the "Efficiency mode" leaf).
+4. Run `pwsh tools/run-elevated.ps1 -NoBuild` again: the existing window comes back; no second process.
+5. "Exit" in the tray ends the process.
+6. `%LocalAppData%\Supermonitor\logs\supermonitor-YYYYMMDD.log` contains "Supermonitor starting" and "Supermonitor stopped".
 
 - [ ] **Step 8: Commit**
 
@@ -5252,21 +5252,21 @@ git commit -m "feat(app): add WinUI 3 shell with tray icon, single instance and 
 
 ---
 
-### Task 15: Dashboard Overview
+### Task 15: Overview dashboard
 
 **Files:**
 - Create: `src/Supermonitor/Controls/ISeriesSource.cs`, `SparklineChart.cs`, `MetricCard.xaml`, `MetricCard.xaml.cs`
 - Create: `src/Supermonitor/ViewModels/MetricCardViewModel.cs`, `OverviewViewModel.cs`
 - Create: `src/Supermonitor/Views/OverviewPage.xaml`, `OverviewPage.xaml.cs`
-- Modify: `src/Supermonitor/MainWindow.xaml.cs` (método `Navigate`)
+- Modify: `src/Supermonitor/MainWindow.xaml.cs` (`Navigate` method)
 
 **Interfaces:**
-- Consumes: `AppHost.Metrics`, `AppHost.Hub.SampleReady`, `AppHost.Settings.Current.OverviewCards` e `SampleIntervalMs`, `MetricStore.TryGetDescriptor/GetLatest/CopyHistory`, `UnitFormatter`, `PageContext`.
+- Consumes: `AppHost.Metrics`, `AppHost.Hub.SampleReady`, `AppHost.Settings.Current.OverviewCards` and `SampleIntervalMs`, `MetricStore.TryGetDescriptor/GetLatest/CopyHistory`, `UnitFormatter`, `PageContext`.
 - Produces: `interface ISeriesSource { int PointCount { get; } float? FixedMaximum { get; } int CopyHistory(Span<float> destination); event Action? Refreshed; }`.
-- Produces: `MetricCardViewModel(string metricId, MetricStore store)` com `MetricId`, `Title`, `ValueText`, `PointCount`, `FixedMaximum`, `void Refresh(UnitOptions options)`.
-- Produces: `OverviewViewModel(AppHost host, DispatcherQueue dispatcher, Func<bool> isMinimized)` com `ObservableCollection<MetricCardViewModel> Cards`, `Dispose()`. Atualiza no máximo uma vez por tick, só com a janela não minimizada.
+- Produces: `MetricCardViewModel(string metricId, MetricStore store)` with `MetricId`, `Title`, `ValueText`, `PointCount`, `FixedMaximum`, `void Refresh(UnitOptions options)`.
+- Produces: `OverviewViewModel(AppHost host, DispatcherQueue dispatcher, Func<bool> isMinimized)` with `ObservableCollection<MetricCardViewModel> Cards`, `Dispose()`. Updates at most once per tick, only while the window is not minimized.
 
-- [ ] **Step 1: Controles**
+- [ ] **Step 1: Controls**
 
 `src/Supermonitor/Controls/ISeriesSource.cs`:
 ```csharp
@@ -5615,7 +5615,7 @@ public sealed class OverviewViewModel : IDisposable
 }
 ```
 
-- [ ] **Step 3: Página e navegação**
+- [ ] **Step 3: Page and navigation**
 
 `src/Supermonitor/Views/OverviewPage.xaml`:
 ```xml
@@ -5679,7 +5679,7 @@ public sealed partial class OverviewPage : Page
 }
 ```
 
-Em `src/Supermonitor/MainWindow.xaml.cs`, substituir o método `Navigate` e adicionar `using Supermonitor.Views;`:
+In `src/Supermonitor/MainWindow.xaml.cs`, replace the `Navigate` method and add `using Supermonitor.Views;`:
 ```csharp
     private void Navigate(string? tag, PageContext context)
     {
@@ -5692,15 +5692,15 @@ Em `src/Supermonitor/MainWindow.xaml.cs`, substituir o método `Navigate` e adic
     }
 ```
 
-- [ ] **Step 4: Build e verificação manual**
+- [ ] **Step 4: Build and manual verification**
 
 Run: `pwsh tools/run-elevated.ps1`
 Expected:
-1. Overview mostra 8 cards: CPU usage, Memory usage, GPU usage, GPU VRAM used, Disk 0 (…) active time, Download, Upload, Ping.
-2. Valores mudam a cada 1 s e o gráfico de linha cresce da direita para a esquerda.
-3. Com o Gerenciador de Tarefas aberto ao lado: CPU, memória, GPU 3D, disco e rede batem dentro de ±2 pontos percentuais ou ±5%.
-4. Minimizar a janela: valores param de atualizar; restaurar volta a atualizar.
-5. Nenhum card fica travado em "N/A" exceto se o recurso não existir na máquina.
+1. Overview shows 8 cards: CPU usage, Memory usage, GPU usage, GPU VRAM used, Disk 0 (…) active time, Download, Upload, Ping.
+2. Values change every 1 s and the line chart grows from right to left.
+3. With Task Manager open alongside: CPU, memory, GPU 3D, disk and network match within ±2 percentage points or ±5%.
+4. Minimize the window: values stop updating; restoring resumes updates.
+5. No card is stuck on "N/A" unless the resource does not exist on the machine.
 
 - [ ] **Step 5: Commit**
 
@@ -5711,17 +5711,17 @@ git commit -m "feat(app): add overview dashboard with live metric cards and spar
 
 ---
 
-### Task 16: Página Settings
+### Task 16: Settings page
 
 **Files:**
 - Create: `src/Supermonitor/Views/SettingsPage.xaml`, `SettingsPage.xaml.cs`
-- Modify: `src/Supermonitor/MainWindow.xaml.cs` (método `Navigate`)
+- Modify: `src/Supermonitor/MainWindow.xaml.cs` (`Navigate` method)
 
 **Interfaces:**
 - Consumes: `AppSettings.AllowedIntervalsMs`, `SettingsStore.RequestSave`, `SensorHub.Interval`, `AutostartManager.IsEnabled/SetEnabled`, `Log`.
-- Produces: página de configurações com intervalo, host de ping, iniciar com o Windows e iniciar minimizado.
+- Produces: settings page with interval, ping host, start with Windows and start minimized.
 
-- [ ] **Step 1: Página**
+- [ ] **Step 1: Page**
 
 `src/Supermonitor/Views/SettingsPage.xaml`:
 ```xml
@@ -5857,22 +5857,22 @@ public sealed partial class SettingsPage : Page
 }
 ```
 
-Em `MainWindow.xaml.cs`, adicionar o caso ao `switch` de `Navigate`:
+In `MainWindow.xaml.cs`, add the case to the `switch` in `Navigate`:
 ```csharp
             case "settings":
                 ContentFrame.Navigate(typeof(SettingsPage), context);
                 break;
 ```
 
-- [ ] **Step 2: Build e verificação manual**
+- [ ] **Step 2: Build and manual verification**
 
 Run: `pwsh tools/run-elevated.ps1`
 Expected:
-1. Settings mostra "1 second", ping `1.1.1.1`, toggles desligados.
-2. Mudar para "250 ms": os cards do Overview passam a atualizar 4×/s; `settings.json` tem `"sampleIntervalMs": 250` depois de ~0,5 s.
-3. Ping host `abc def`: mensagem de erro e o valor volta ao anterior. `8.8.8.8`: aceito e salvo.
-4. "Start with Windows" ligado: `schtasks /Query /TN Supermonitor` lista a tarefa; desligado: a tarefa some.
-5. Fechar pelo tray "Exit", reabrir: configurações persistem.
+1. Settings shows "1 second", ping `1.1.1.1`, toggles off.
+2. Change to "250 ms": the Overview cards now update 4×/s; `settings.json` has `"sampleIntervalMs": 250` after ~0.5 s.
+3. Ping host `abc def`: error message and the value reverts to the previous one. `8.8.8.8`: accepted and saved.
+4. "Start with Windows" on: `schtasks /Query /TN Supermonitor` lists the task; off: the task disappears.
+5. Close via tray "Exit", reopen: settings persist.
 
 - [ ] **Step 3: Commit**
 
@@ -5883,7 +5883,7 @@ git commit -m "feat(app): add settings page for interval, ping host and startup"
 
 ---
 
-### Task 17: Verificação de desempenho e fechamento
+### Task 17: Performance verification and wrap-up
 
 **Files:**
 - Create: `tools/measure-cpu.ps1`
@@ -5891,9 +5891,9 @@ git commit -m "feat(app): add settings page for interval, ping host and startup"
 
 **Interfaces:**
 - Consumes: app completo.
-- Produces: registro dos critérios de sucesso 1–3 da spec.
+- Produces: record of success criteria 1–3 from the spec.
 
-- [ ] **Step 1: Script de medição**
+- [ ] **Step 1: Measurement script**
 
 `tools/measure-cpu.ps1`:
 ```powershell
@@ -5907,20 +5907,20 @@ $used = ($process.TotalProcessorTime - $start).TotalMilliseconds
 $percent = $used / ($Seconds * 1000 * [Environment]::ProcessorCount) * 100
 'CPU: {0:N2}% | Working set: {1:N0} MB | Private: {2:N0} MB' -f $percent, ($process.WorkingSet64 / 1MB), ($process.PrivateMemorySize64 / 1MB)
 ```
-Se `TotalProcessorTime` der acesso negado (processo elevado), rode o script em um PowerShell elevado.
+If `TotalProcessorTime` gives access denied (elevated process), run the script in an elevated PowerShell.
 
-- [ ] **Step 2: Medir**
+- [ ] **Step 2: Measure**
 
-1. Build Release: `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; executar o exe de `bin\x64\Release\…\win-x64\` como administrador.
-2. Dashboard aberto no Overview, intervalo 1 s: `pwsh tools/measure-cpu.ps1`. Critério: CPU < 1%.
-3. Janela fechada (só bandeja): `pwsh tools/measure-cpu.ps1`. Critério: CPU < 0,3%.
-4. Rodar todos os testes: `dotnet test tests/Supermonitor.Tests` (unidade + hardware). Critério: todos passam.
+1. Release build: `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; run the exe from `bin\x64\Release\…\win-x64\` as administrator.
+2. Dashboard open on Overview, 1 s interval: `pwsh tools/measure-cpu.ps1`. Criterion: CPU < 1%.
+3. Window closed (tray only): `pwsh tools/measure-cpu.ps1`. Criterion: CPU < 0.3%.
+4. Run all tests: `dotnet test tests/Supermonitor.Tests` (unit + hardware). Criterion: all pass.
 
-Se um critério falhar, aplique superpowers:systematic-debugging antes de mudar código. Suspeito principal: o contador `\GPU Engine(*)` tem centenas de instâncias. Meça o tempo de `GpuProvider.Sample` com `Stopwatch` e registre no log antes de otimizar.
+If a criterion fails, apply superpowers:systematic-debugging before changing code. Main suspect: the `\GPU Engine(*)` counter has hundreds of instances. Measure the time of `GpuProvider.Sample` with `Stopwatch` and record it in the log before optimizing.
 
-- [ ] **Step 3: Registrar resultados**
+- [ ] **Step 3: Record results**
 
-`docs/superpowers/plans/2026-10-10-supermonitor-01-results.md` com: data, build (Release), CPU e memória medidos nos dois cenários, resultado dos testes, divergências vistas contra o Gerenciador de Tarefas e qualquer desvio do plano (ex.: troca para o metapacote do Windows App SDK).
+`docs/superpowers/plans/2026-10-10-supermonitor-01-results.md` with: date, build (Release), CPU and memory measured in both scenarios, test results, divergences seen against Task Manager and any deviation from the plan (e.g.: swap to the Windows App SDK metapackage).
 
 - [ ] **Step 4: Commit**
 

@@ -1,6 +1,6 @@
 namespace Supermonitor.Core.Sensors.Network;
 
-// Índice estável por LUID: adaptadores novos recebem o próximo índice; um adaptador que some e volta mantém o seu.
+// Stable index per LUID: new adapters get the next index; an adapter that disappears and returns keeps its own.
 public sealed class NetworkAdapterRegistry
 {
     private readonly Dictionary<ulong, int> _indexes = [];

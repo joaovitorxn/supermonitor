@@ -88,7 +88,7 @@ public sealed class GpuEngineAggregator
     {
         if (!_matched[adapter])
         {
-            // Nenhuma instância deste adaptador (ex.: LUID mudou após atualização do driver).
+            // No instance for this adapter (e.g. LUID changed after a driver update).
             return new GpuUsage(float.NaN, float.NaN, float.NaN, float.NaN, float.NaN, float.NaN);
         }
 

@@ -13,12 +13,12 @@ public sealed class OverlayFrame
 
     public OverlayRow[] Rows { get; }
 
-    // Frametimes (ms), do mais antigo ao mais novo; vazio quando o mini-gráfico está desligado.
+    // Frametimes (ms), oldest to newest; empty when the mini-graph is off.
     public float[] Graph { get; }
 
     public long GraphVersion { get; }
 
-    // Decide se vale redesenhar: texto igual e gráfico sem frame novo → não.
+    // Decides whether to redraw: same text and no new graph frame means no.
     public bool SameContentAs(OverlayFrame? other) =>
         other is not null
         && Rows.AsSpan().SequenceEqual(other.Rows)

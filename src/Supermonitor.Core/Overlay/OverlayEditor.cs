@@ -64,7 +64,7 @@ public static class OverlayEditor
     public static IReadOnlyList<OverlayPreset> AllPresets(OverlaySettings overlay) =>
         [.. OverlayPresets.BuiltIn(), .. overlay.UserPresets];
 
-    // Nome do preset cujo estilo é idêntico ao atual, ou null quando o usuário mexeu em algo.
+    // Name of the preset whose style matches the current one, or null when the user changed something.
     public static string? MatchingPresetName(OverlaySettings overlay)
     {
         var current = Serialize(overlay.Style);

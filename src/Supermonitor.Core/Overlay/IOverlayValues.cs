@@ -4,16 +4,16 @@ public interface IOverlayValues
 {
     DateTime Now { get; }
 
-    // Muda a cada frame novo; o overlay usa para redesenhar o mini-gráfico.
+    // Changes on every new frame; the overlay uses it to redraw the mini-graph.
     long FrameVersion { get; }
 
-    // Valor na unidade base da métrica; NaN quando indisponível.
+    // Value in the metric's base unit; NaN when unavailable.
     double Get(OverlayMetric metric);
 
     int CopyFrameTimes(Span<float> destination);
 }
 
-// Valores fixos e plausíveis para o preview do editor.
+// Fixed, plausible values for the editor preview.
 public sealed class DemoOverlayValues : IOverlayValues
 {
     private const int FrameCount = 300;

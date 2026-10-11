@@ -39,7 +39,7 @@ public static class Program
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
-            // Processo anterior já terminou.
+            // Previous process has already exited.
         }
     }
 }

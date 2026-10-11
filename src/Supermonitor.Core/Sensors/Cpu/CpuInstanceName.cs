@@ -4,7 +4,7 @@ namespace Supermonitor.Core.Sensors.Cpu;
 
 public static class CpuInstanceName
 {
-    // Instâncias de "Processor Information": "grupo,núcleo" (ex.: "0,7"), "0,_Total", "_Total".
+    // "Processor Information" instances: "group,core" (e.g. "0,7"), "0,_Total", "_Total".
     public static bool TryParse(ReadOnlySpan<char> name, out int key)
     {
         key = 0;

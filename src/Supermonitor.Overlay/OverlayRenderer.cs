@@ -15,8 +15,8 @@ public readonly record struct OverlayBitmap(nint Hdc, nint Bits, int Width, int 
     public unsafe ReadOnlySpan<byte> Pixels => new((void*)Bits, Width * Height * 4);
 }
 
-// Desenha o OverlayFrame com Direct2D/DirectWrite num DIB 32 bits premultiplicado (o formato do UpdateLayeredWindow).
-// Não toca em janelas: o overlay apresenta o DIB e o preview do editor copia os pixels.
+// Draws the OverlayFrame with Direct2D/DirectWrite into a 32-bit premultiplied DIB (the UpdateLayeredWindow format).
+// Does not touch windows: the overlay presents the DIB and the editor preview copies the pixels.
 public sealed class OverlayRenderer : IDisposable
 {
     private readonly ID2D1Factory1 _d2d = D2D1.D2D1CreateFactory<ID2D1Factory1>();
@@ -126,7 +126,7 @@ public sealed class OverlayRenderer : IDisposable
         _d2d.Dispose();
     }
 
-    // Preenche as posições de cada linha e devolve o tamanho do bloco de texto.
+    // Fills in each line's position and returns the text block size.
     private static (float Width, float Height) Arrange(OverlayLayout layout, IDWriteTextLayout[] labels, IDWriteTextLayout[] values, float fontSize, float[] labelX, float[] valueX, float[] rowY)
     {
         var count = labels.Length;
@@ -218,7 +218,7 @@ public sealed class OverlayRenderer : IDisposable
         if (_target is null)
         {
             var properties = new RenderTargetProperties(
-                // Software: o overlay é pequeno, evita a leitura GPU→CPU a cada frame durante o jogo e não sofre perda de dispositivo (TDR).
+                // Software: the overlay is small, avoids GPU→CPU readback every frame during gameplay and is immune to device loss (TDR).
                 RenderTargetType.Software,
                 new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
                 0,

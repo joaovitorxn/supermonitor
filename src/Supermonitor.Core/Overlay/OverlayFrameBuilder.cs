@@ -39,7 +39,7 @@ public static class OverlayFrameBuilder
             };
 
             rows[i] = new OverlayRow(
-                OverlayMetricCatalog.Label(item.Metric),
+                item.CustomLabel ?? OverlayMetricCatalog.Label(item.Metric),
                 FormatValue(item.Metric, value, now, units),
                 Rgba.Parse(item.LabelColor, defaultLabel),
                 valueColor);
@@ -49,7 +49,7 @@ public static class OverlayFrameBuilder
         long version = 0;
         if (style.ShowFrameGraph)
         {
-            // Duas amostras por pixel de largura do gráfico.
+            // Two samples per pixel of graph width.
             var buffer = new float[Math.Max(1, style.GraphWidth / 2)];
             var copied = values.CopyFrameTimes(buffer);
             graph = copied == buffer.Length ? buffer : buffer.AsSpan(0, copied).ToArray();
@@ -71,7 +71,7 @@ public static class OverlayFrameBuilder
             return "N/A";
         }
 
-        // O rótulo já diz "FPS"; o valor mostra só o número.
+        // The label already says "FPS"; the value shows only the number.
         if (metric is OverlayMetric.Fps or OverlayMetric.Low1Percent)
         {
             return value.ToString("0", Culture);

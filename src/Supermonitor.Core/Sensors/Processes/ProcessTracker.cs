@@ -4,7 +4,7 @@ public readonly record struct ProcessSample(int ProcessId, string Name, float Cp
 
 public static class ProcessCpuCalculator
 {
-    // Tempos em unidades de 100 ns; percentual sobre todos os núcleos lógicos (igual ao Gerenciador de Tarefas).
+    // Times in 100 ns units; percent over all logical cores (same as Task Manager).
     public static double Percent(long previous, long current, TimeSpan elapsed, int processorCount)
     {
         if (elapsed <= TimeSpan.Zero || processorCount <= 0)

@@ -9,8 +9,8 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
 
 public static class OverlayPlacement
 {
-    // O offset é uma margem para dentro a partir da borda da âncora; no centro desloca para direita/baixo.
-    // O resultado sempre cabe no monitor (ou cola no canto superior esquerdo se o overlay for maior).
+    // The offset is an inward margin from the anchor edge; at center it shifts right/down.
+    // The result always fits the monitor (or sticks to the top-left corner if the overlay is larger).
     public static (int X, int Y) Compute(OverlayAnchor anchor, int offsetX, int offsetY, PixelRect monitor, int width, int height)
     {
         var column = (int)anchor % 3;

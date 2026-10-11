@@ -119,7 +119,7 @@ public sealed partial class TimeSeriesChart : UserControl
             return;
         }
 
-        // A janela inteira (count pontos) ocupa a largura; a série fica alinhada à direita.
+        // The whole window (count points) spans the width; the series is right-aligned.
         var slots = Math.Max(2, Math.Min(count, (int)width));
         var visibleSlots = Math.Max(2, (int)Math.Ceiling((double)n * slots / count));
         if (_plot.Length < visibleSlots)

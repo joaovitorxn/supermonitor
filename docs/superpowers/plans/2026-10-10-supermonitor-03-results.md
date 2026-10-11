@@ -1,42 +1,42 @@
-# Supermonitor Plano 3 — Resultados
+# Supermonitor Plan 3 — Results
 
-Data: 2026-10-11
-Build: Release x64, branch `feat/fps-overlay`, executado como administrador.
-Máquina: Ryzen 7 7800X3D, RX 9070 XT, Windows 11 26H2, monitor principal 2560×1440 a 240 Hz.
+Date: 2026-10-11
+Build: Release x64, branch `feat/fps-overlay`, run as administrator.
+Machine: Ryzen 7 7800X3D, RX 9070 XT, Windows 11 26H2, primary monitor 2560×1440 at 240 Hz.
 
-## Testes
+## Tests
 
-`dotnet test --project tests/Supermonitor.Tests` (unidade + hardware, shell sem elevação): 328 no total, 326 aprovados, 0 falhas, 2 ignorados (testes ETW que exigem administrador).
+`dotnet test --project tests/Supermonitor.Tests` (unit + hardware, non-elevated shell): 328 total, 326 passed, 0 failed, 2 skipped (ETW tests that require administrator).
 
-Os testes ETW (`FrameCaptureSmokeTests`) foram rodados também com elevação (pwsh lançado com UAC): 3 aprovados e 1 ignorado (o caso "sem administrador", que só vale fora de elevação). A sessão órfã é substituída e a sessão some no `Dispose`.
+The ETW tests (`FrameCaptureSmokeTests`) were also run elevated (pwsh launched with UAC): 3 passed and 1 skipped (the "no administrator" case, which only applies when not elevated). The orphan session is replaced and the session disappears on `Dispose`.
 
-## Desempenho (60 s por cenário, `tools/measure-cpu.ps1`, intervalo 1 s)
+## Performance (60 s per scenario, `tools/measure-cpu.ps1`, 1 s interval)
 
-| Cenário | CPU | Working set | Private | Critério | Resultado |
+| Scenario | CPU | Working set | Private | Criterion | Result |
 |---|---|---|---|---|---|
-| Janela principal aberta (não conferi qual página) + overlay ligado (Default) | 0,21% | 292 MB | 282 MB | < 1% | Passou |
-| Só bandeja + overlay ligado (Default, gráfico a 30 Hz, janela animando em primeiro plano) | 0,15% | 302 MB | 291 MB | < 0,3% | Passou |
-| Só bandeja, overlay desligado | 0,01% | 300 MB | 289 MB | < 0,3% | Passou |
+| Main window open (I did not check which page) + overlay on (Default) | 0.21% | 292 MB | 282 MB | < 1% | Passed |
+| Tray only + overlay on (Default, chart at 30 Hz, window animating in foreground) | 0.15% | 302 MB | 291 MB | < 0.3% | Passed |
+| Tray only, overlay off | 0.01% | 300 MB | 289 MB | < 0.3% | Passed |
 
-Duas medições anteriores de "só bandeja" (0,19% com overlay ligado e 0,15–0,17% com overlay desligado) foram descartadas: a janela principal ainda estava aberta (conferido com `MainWindowHandle`). Com a janela de fato fechada e o overlay desligado, o custo voltou a 0,01%, o mesmo do Plano 2, e a sessão ETW não existe (`logman query -ets` sem `Supermonitor-FPS`), o que mostra que as leases de FPS e de hardware foram liberadas. O custo do overlay ligado (≈0,14 ponto) vem do mini-gráfico a 30 Hz e do processamento dos eventos ETW. O preset Minimal (4 Hz, sem gráfico) não foi medido.
+Two earlier "tray only" measurements (0.19% with overlay on and 0.15–0.17% with overlay off) were discarded: the main window was still open (checked with `MainWindowHandle`). With the window actually closed and the overlay off, the cost went back to 0.01%, the same as Plan 2, and the ETW session does not exist (`logman query -ets` without `Supermonitor-FPS`), which shows the FPS and hardware leases were released. The cost of the overlay being on (≈0.14 point) comes from the 30 Hz mini-chart and the processing of ETW events. The Minimal preset (4 Hz, no chart) was not measured.
 
-## FPS real (critério 4 da spec)
+## Real FPS (spec criterion 4)
 
-Verificado pelo usuário com um jogo em modo janela/borderless: o FPS do overlay bate com o do jogo e o overlay funciona. Não houve comparação numérica com uma segunda ferramenta além dessa confirmação. DX11/DX12 funcionou só com o evento `Present` do DxgKrnl, então o fallback pelo DXGI não foi necessário.
+Verified by the user with a game in windowed/borderless mode: the overlay FPS matches the game's and the overlay works. There was no numeric comparison with a second tool beyond this confirmation. DX11/DX12 worked with only the DxgKrnl `Present` event, so the DXGI fallback was not needed.
 
-## Recuperação após falha
+## Crash recovery
 
-Com o overlay ligado, `Stop-Process -Force` no app deixou a sessão `Supermonitor-FPS` ativa (`logman query -ets`). Ao reabrir o app, o log mostra "Frame capture started" e a lista de sessões tem uma única `Supermonitor-FPS`. O teste de hardware `Etw_source_replaces_an_orphan_session_with_the_same_name` cobre o mesmo caso.
+With the overlay on, `Stop-Process -Force` on the app left the `Supermonitor-FPS` session active (`logman query -ets`). On reopening the app, the log shows "Frame capture started" and the session list has a single `Supermonitor-FPS`. The hardware test `Etw_source_replaces_an_orphan_session_with_the_same_name` covers the same case.
 
-## Verificações manuais (Tasks 8 e 9)
+## Manual checks (Tasks 8 and 9)
 
-Confirmadas pelo usuário: o overlay funciona (liga e desliga pelo item "Show overlay" da bandeja, repetidas vezes, e continua com a janela principal fechada). A página Overlay (editor, presets, preview) compilou e abre, mas o usuário não relatou o roteiro completo do Step 6 da Task 9; ele fica como verificação pendente.
+Confirmed by the user: the overlay works (turns on and off through the tray's "Show overlay" item, repeatedly, and keeps working with the main window closed). The Overlay page (editor, presets, preview) compiled and opens, but the user did not report the full Step 6 script of Task 9; it remains a pending check.
 
-## Desvios do plano e decisões
+## Deviations from the plan and decisions
 
-- Captura só pelo evento `Present` (id 184) do DxgKrnl; o DXGI da spec 3.4 não é usado. Motivo: o evento DXGI não chegou para o processo testado (Chromium usa DirectComposition) e o DxgKrnl traz o PID correto. O fallback ficou documentado e não foi preciso.
-- FPS, frametime e 1% low não são métricas da `MetricStore` (não há cards de FPS no dashboard); o overlay lê direto do `FrameCaptureService`.
-- O item "estado do limitador" do overlay (spec 4.4) fica para o Plano 4, com o `IFrameLimiter`.
-- O alvo do FPS é o processo em primeiro plano, qualquer app. A restrição a jogos detectados vem com o `GameDetector` do Plano 4.
-- O teste existente `Version_one_overview_cards_become_v2_cards` passou a afirmar `SettingsMigrator.CurrentVersion` (um documento v1 agora migra até o v3); o plano não previa essa mudança.
-- Uma instância elevada do app mantém o overlay em EcoQoS quando a janela fecha; a medição acima mostra que o custo continua dentro do critério.
+- Capture only through the DxgKrnl `Present` event (id 184); the DXGI from spec 3.4 is not used. Reason: the DXGI event did not arrive for the tested process (Chromium uses DirectComposition) and DxgKrnl carries the correct PID. The fallback stayed documented and was not needed.
+- FPS, frametime and 1% low are not `MetricStore` metrics (there are no FPS cards on the dashboard); the overlay reads directly from `FrameCaptureService`.
+- The overlay's "limiter state" item (spec 4.4) is left for Plan 4, with `IFrameLimiter`.
+- The FPS target is the foreground process, any app. Restriction to detected games comes with Plan 4's `GameDetector`.
+- The existing test `Version_one_overview_cards_become_v2_cards` now asserts `SettingsMigrator.CurrentVersion` (a v1 document now migrates up to v3); the plan did not foresee this change.
+- An elevated app instance keeps the overlay in EcoQoS when the window closes; the measurement above shows the cost stays within the criterion.

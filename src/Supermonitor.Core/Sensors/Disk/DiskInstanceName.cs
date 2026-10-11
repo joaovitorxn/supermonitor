@@ -4,7 +4,7 @@ namespace Supermonitor.Core.Sensors.Disk;
 
 public static class DiskInstanceName
 {
-    // Instâncias de "PhysicalDisk": "0 C:", "1 D: E:", "_Total".
+    // "PhysicalDisk" instances: "0 C:", "1 D: E:", "_Total".
     public static bool TryParse(ReadOnlySpan<char> name, out int index, out ReadOnlySpan<char> label)
     {
         label = default;

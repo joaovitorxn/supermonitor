@@ -46,7 +46,7 @@ public static unsafe partial class Privileges
                 return false;
             }
 
-            // ERROR_NOT_ALL_ASSIGNED (1300): o token não tem o privilégio (app sem elevação).
+            // ERROR_NOT_ALL_ASSIGNED (1300): the token lacks the privilege (app not elevated).
             return Marshal.GetLastPInvokeError() == 0;
         }
         finally

@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 
 namespace Supermonitor.Core.Overlay;
 
-// Nome desconhecido (arquivo de outra versão ou editado à mão) vira um valor indefinido em vez de derrubar o
-// arquivo inteiro; o Normalize troca por padrão ou descarta o item.
+// Unknown name (file from another version or hand-edited) becomes an undefined value instead of failing the
+// whole file; Normalize swaps in a default or drops the item.
 public sealed class LenientEnumConverter<T> : JsonConverter<T> where T : struct, Enum
 {
     public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

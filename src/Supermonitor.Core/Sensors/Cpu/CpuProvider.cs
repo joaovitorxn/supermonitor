@@ -61,6 +61,6 @@ public sealed class CpuProvider : ISensorProvider
 
     public void Dispose() => _query?.Dispose();
 
-    // "% Processor Utility" passa de 100 com turbo boost; o Gerenciador de Tarefas limita a 100.
+    // "% Processor Utility" exceeds 100 with turbo boost; Task Manager caps it at 100.
     private static float Clamp(double value) => double.IsFinite(value) ? (float)Math.Clamp(value, 0, 100) : float.NaN;
 }

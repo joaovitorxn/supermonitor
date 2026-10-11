@@ -1,37 +1,37 @@
-# Supermonitor Plano 2 — Sensores de hardware e dashboard completo: Implementation Plan
+# Supermonitor Plan 2 — Hardware sensors and full dashboard: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Adicionar sensores de hardware (temperaturas, clocks, potência, fans via LibreHardwareMonitor), lista de processos, páginas de detalhe (CPU, Memory, GPU, Disks, Network, Processes) e customização completa do dashboard e da aparência.
+**Goal:** Add hardware sensors (temperatures, clocks, power, fans via LibreHardwareMonitor), a process list, detail pages (CPU, Memory, GPU, Disks, Network, Processes) and full customization of the dashboard and appearance.
 
-**Architecture:** Continua o processo único da fundação. `DemandTracker` liga provedores caros (LHM, processos) só enquanto alguém consome. `HardwareProvider` mapeia sensores LHM para a mesma `MetricStore`, com ids estáveis (`cpu.temp`, `gpu0.temp`…) para os sensores mais usados. `ProcessMonitor` lê `NtQuerySystemInformation` e cruza com o uso de GPU por PID vindo do `GpuProvider`. Configurações passam para o schema v2 (cards com tamanho e tipo de gráfico, tema, fundo, cor de destaque, unidades, limiares). Páginas de detalhe usam uma `CategoryPage` genérica que agrupa métricas por dispositivo.
+**Architecture:** Continues the single process from the foundation. `DemandTracker` turns on expensive providers (LHM, processes) only while someone consumes them. `HardwareProvider` maps LHM sensors into the same `MetricStore`, with stable ids (`cpu.temp`, `gpu0.temp`…) for the most used sensors. `ProcessMonitor` reads `NtQuerySystemInformation` and cross-references per-PID GPU usage coming from `GpuProvider`. Settings move to schema v2 (cards with size and chart kind, theme, backdrop, accent color, units, thresholds). Detail pages use a generic `CategoryPage` that groups metrics by device.
 
-**Tech Stack:** igual ao Plano 1 + `LibreHardwareMonitorLib` 0.9.6 (driver PawnIO, winget id `namazso.PawnIO`).
+**Tech Stack:** same as Plan 1 + `LibreHardwareMonitorLib` 0.9.6 (PawnIO driver, winget id `namazso.PawnIO`).
 
 **Spec:** `docs/superpowers/specs/2026-10-10-supermonitor-design.md`
-**Índice:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
-**Base:** `main` em `1a4ad29` (Plano 1 concluído; resultados em `docs/superpowers/plans/2026-10-10-supermonitor-01-results.md`).
+**Index:** `docs/superpowers/plans/2026-10-10-supermonitor-plan-index.md`
+**Base:** `main` at `1a4ad29` (Plan 1 complete; results in `docs/superpowers/plans/2026-10-10-supermonitor-01-results.md`).
 
 ## Global Constraints
 
-- Tudo do Plano 1 continua valendo: Windows 11, x64, `net10.0-windows10.0.22621.0`, unpackaged, `requireAdministrator`, UI em EN-US, `N/A` para valor ausente, sem alocação por tick nos provedores do caminho quente (`ProcessMonitor` e `HardwareProvider` só rodam sob demanda e podem alocar dentro do LHM/snapshot).
-- Testes de unidade: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`. Testes de hardware: `dotnet test --project tests/Supermonitor.Tests --filter-trait "Category=Hardware"`. Suíte completa: `dotnet test --project tests/Supermonitor.Tests`.
-- Build do app: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64`. Com o app aberto o exe fica bloqueado; para checar compilação use `-p:OutDir=<pasta temporária>\`.
-- O app elevado não pode ser encerrado nem clicado por um shell sem elevação. Verificações visuais ficam com o usuário (sair pela bandeja, aprovar UAC).
-- Critérios de desempenho continuam: dashboard aberto < 1% CPU, só bandeja < 0,3% CPU (build Release, intervalo 1 s).
-- Sensores LHM nunca são lidos na thread de UI. `Computer.Open()` leva ~765 ms nesta máquina.
-- Limiares são comparados na unidade base da métrica (°C, %, bytes), mesmo quando a exibição está em °F ou bits.
-- Glifos (Segoe Fluent Icons, conferidos visualmente): Home `E80F`, CPU `E950`, Memory `E964`, GPU `F211`, Disks `EDA2`, Network `E968`, Processes `E8FD`, Edit `E70F`, Add `E710`, Remove `E74D`.
-- Nomes reais dos sensores LHM nesta máquina (probe 2026-10-10): CPU `Core (Tctl/Tdie)` (temperatura), `Package` (potência), `Cores (Average)` (clock); GPU AMD `GPU Core`/`GPU Hot Spot`/`GPU Memory` (temperatura), `GPU Core`/`GPU Memory` (clock), `GPU Package` (potência), `GPU Fan` (Fan e Control).
-- Todo commit termina com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Everything from Plan 1 still applies: Windows 11, x64, `net10.0-windows10.0.22621.0`, unpackaged, `requireAdministrator`, EN-US UI, `N/A` for a missing value, no per-tick allocation in hot-path providers (`ProcessMonitor` and `HardwareProvider` only run on demand and may allocate inside LHM/snapshot).
+- Unit tests: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`. Hardware tests: `dotnet test --project tests/Supermonitor.Tests --filter-trait "Category=Hardware"`. Full suite: `dotnet test --project tests/Supermonitor.Tests`.
+- App build: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64`. With the app open the exe is locked; to check compilation use `-p:OutDir=<temp folder>\`.
+- The elevated app cannot be closed or clicked by a non-elevated shell. Visual checks are left to the user (quit via the tray, approve UAC).
+- Performance criteria still apply: dashboard open < 1% CPU, tray only < 0.3% CPU (Release build, 1 s interval).
+- LHM sensors are never read on the UI thread. `Computer.Open()` takes ~765 ms on this machine.
+- Thresholds are compared in the metric's base unit (°C, %, bytes), even when the display is in °F or bits.
+- Glyphs (Segoe Fluent Icons, visually verified): Home `E80F`, CPU `E950`, Memory `E964`, GPU `F211`, Disks `EDA2`, Network `E968`, Processes `E8FD`, Edit `E70F`, Add `E710`, Remove `E74D`.
+- Real LHM sensor names on this machine (probe 2026-10-10): CPU `Core (Tctl/Tdie)` (temperature), `Package` (power), `Cores (Average)` (clock); AMD GPU `GPU Core`/`GPU Hot Spot`/`GPU Memory` (temperature), `GPU Core`/`GPU Memory` (clock), `GPU Package` (power), `GPU Fan` (Fan and Control).
+- Every commit ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
 
-1. LHM indisponível ou parcial (PawnIO ausente, sem admin, GPU sem suporte ADL) → app abre normalmente; métricas LHM ausentes ou `N/A`; GPU via PDH continua funcionando. Testes: Task 3 (mapeador ignora tipos desconhecidos) e Task 2 (provedor sem demanda fica `N/A`).
-2. Arquivo de configurações v1 do Plano 1 (`overviewCards`) → carrega no schema v2 sem perder os cards. Teste na Task 6.
-3. Processos que nascem e morrem entre amostras e PID reutilizado → sem exceção; CPU% só calculado para o mesmo `(pid, createTime)`. Testes na Task 5 (`ProcessTracker`).
-4. Card cuja métrica não existe na máquina (ex.: `gpu0.temp` sem LHM) → card mostra `N/A` e pode ser removido, movido e redimensionado. Teste na Task 7 (`DashboardEditor` opera só por id).
-5. Lease de demanda que vaza (página descarregada, janela fechada) → LHM continuaria rodando na bandeja. Teste de lease na Task 2; verificação de CPU só-bandeja na Task 15.
+1. LHM unavailable or partial (PawnIO missing, no admin, GPU without ADL support) → app opens normally; LHM metrics absent or `N/A`; GPU via PDH keeps working. Tests: Task 3 (mapper ignores unknown types) and Task 2 (provider without demand stays `N/A`).
+2. Plan 1 v1 settings file (`overviewCards`) → loads into schema v2 without losing the cards. Test in Task 6.
+3. Processes that start and die between samples and reused PIDs → no exception; CPU% only computed for the same `(pid, createTime)`. Tests in Task 5 (`ProcessTracker`).
+4. Card whose metric does not exist on the machine (e.g. `gpu0.temp` without LHM) → card shows `N/A` and can be removed, moved and resized. Test in Task 7 (`DashboardEditor` operates by id only).
+5. Demand lease that leaks (page unloaded, window closed) → LHM would keep running in the tray. Lease test in Task 2; tray-only CPU check in Task 15.
 
 ---
 
@@ -41,19 +41,19 @@
 src/Supermonitor.Core/
   Supermonitor.Core.csproj                  + LibreHardwareMonitorLib
   AppHost.cs                                + Demand, Processes, HardwareProvider, ProcessGpuUsage
-  Diagnostics/Log.cs                        prune tolera arquivo somente leitura
-  Metrics/MetricUnit.cs                     MetricDescriptor ganha Device
-  Metrics/MetricIds.cs                      + ids conhecidos de hardware
-  Sensors/ISensorProvider.cs                + RequiredDemand (membro padrão)
+  Diagnostics/Log.cs                        prune tolerates read-only file
+  Metrics/MetricUnit.cs                     MetricDescriptor gains Device
+  Metrics/MetricIds.cs                      + known hardware ids
+  Sensors/ISensorProvider.cs                + RequiredDemand (default member)
   Sensors/DemandTracker.cs                  Demand, DemandTracker
-  Sensors/SensorHub.cs                      handlers isolados, init fora da UI, demanda
-  Sensors/Hardware/HardwareSensorMapper.cs  categoria, unidade, ids conhecidos, GpuIndexMatcher
+  Sensors/SensorHub.cs                      isolated handlers, init off the UI thread, demand
+  Sensors/Hardware/HardwareSensorMapper.cs  category, unit, known ids, GpuIndexMatcher
   Sensors/Hardware/HardwareProvider.cs      LHM
   Sensors/Hardware/PawnIoInstaller.cs
-  Sensors/Gpu/GpuEngineAggregator.cs        + uso por PID
+  Sensors/Gpu/GpuEngineAggregator.cs        + per-PID usage
   Sensors/Gpu/ProcessGpuUsage.cs
-  Sensors/Gpu/GpuProvider.cs                publica uso por PID
-  Sensors/Processes/SystemProcessParser.cs  RawProcessEntry, parse do buffer nativo
+  Sensors/Gpu/GpuProvider.cs                publishes per-PID usage
+  Sensors/Processes/SystemProcessParser.cs  RawProcessEntry, native buffer parsing
   Sensors/Processes/ProcessTracker.cs       ProcessSample, ProcessCpuCalculator, ProcessTracker
   Sensors/Processes/ProcessMonitor.cs
   Sensors/Processes/ProcessSorting.cs
@@ -61,48 +61,48 @@ src/Supermonitor.Core/
   Settings/CardSettings.cs                  CardSettings, CardSize, ChartKind, AppTheme, BackdropKind, MetricThreshold
   Settings/ColorText.cs
   Settings/SettingsMigrator.cs              v1 → v2
-  Settings/SettingsJsonContext.cs           enums como string
+  Settings/SettingsJsonContext.cs           enums as string
   Dashboard/DashboardEditor.cs
   Dashboard/ThresholdEvaluator.cs
   Dashboard/ChartSampler.cs
   Dashboard/MemoryComposition.cs
   Shell/RestartArguments.cs
-  Shell/AutostartManager.cs                 timeout do schtasks
+  Shell/AutostartManager.cs                 schtasks timeout
 src/Supermonitor/
   Program.cs                                --wait-for-pid
-  App.xaml.cs                               Restart, avisos únicos, log de exceções em background
-  MainWindow.xaml(.cs)                      ícones, novas páginas, aparência, lease, banner PawnIO
+  App.xaml.cs                               Restart, one-time warnings, background exception logging
+  MainWindow.xaml(.cs)                      icons, new pages, appearance, lease, PawnIO banner
   Appearance/AppearanceService.cs, AccentPalette.cs
-  Controls/TimeSeriesChart.cs               substitui SparklineChart.cs
+  Controls/TimeSeriesChart.cs               replaces SparklineChart.cs
   Controls/CardWrapLayout.cs, CardMetrics.cs
-  Controls/MetricCard.xaml(.cs)             tamanho, tipo de gráfico, limiar, menu, arraste
+  Controls/MetricCard.xaml(.cs)             size, chart kind, threshold, menu, drag
   Controls/MemoryCompositionBar.xaml(.cs)
   Dialogs/AddCardDialog.cs, ThresholdDialog.cs
   ViewModels/MetricCardViewModel.cs, ICardActions.cs, OverviewViewModel.cs
   ViewModels/CategoryViewModel.cs, MetricGroupViewModel.cs, ProcessRowViewModel.cs, ProcessesViewModel.cs
   Views/OverviewPage.xaml(.cs), CategoryPage.xaml(.cs), ProcessesPage.xaml(.cs), SettingsPage.xaml(.cs)
-tests/Supermonitor.Tests/                   um arquivo por unidade, listado em cada task
+tests/Supermonitor.Tests/                   one file per unit, listed in each task
 ```
 
 ---
 
-### Task 1: Robustez do hub, log e campo Device
+### Task 1: Hub robustness, log and Device field
 
 **Files:**
 - Modify: `src/Supermonitor.Core/Metrics/MetricUnit.cs`, `src/Supermonitor.Core/Sensors/SensorHub.cs`, `src/Supermonitor.Core/Diagnostics/Log.cs`
-- Modify: provedores `Cpu/CpuProvider.cs`, `Memory/MemoryProvider.cs`, `Gpu/GpuProvider.cs`, `Disk/DiskProvider.cs`, `Disk/DriveSpaceProvider.cs`, `Network/NetworkProvider.cs`, `Network/PingProvider.cs`
+- Modify: providers `Cpu/CpuProvider.cs`, `Memory/MemoryProvider.cs`, `Gpu/GpuProvider.cs`, `Disk/DiskProvider.cs`, `Disk/DriveSpaceProvider.cs`, `Network/NetworkProvider.cs`, `Network/PingProvider.cs`
 - Modify: `src/Supermonitor/App.xaml.cs`
 - Test: `tests/Supermonitor.Tests/Sensors/SensorHubTests.cs`, `tests/Supermonitor.Tests/Sensors/FakeProvider.cs`, `tests/Supermonitor.Tests/Diagnostics/LogTests.cs`, `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
 
 **Interfaces:**
 - Produces: `sealed record MetricDescriptor(string Id, string DisplayName, MetricCategory Category, MetricUnit Unit, string? Device = null)`.
-- Produces: `SensorHub.SampleReady` passa a ser `event Action` com lista copy-on-write; um handler que lança não impede os seguintes; falhas de handler são logadas no máximo uma vez por minuto.
-- Produces: `SensorHub.Start()` não bloqueia: `InitializeProviders()` roda na thread do loop.
-- Produces: valores de `Device`: CPU total `"CPU"`, núcleos `"CPU cores"`, memória `"Memory"`, GPU `GpuAdapterInfo.Name`, disco `"Disk n (X:)"`, drives `"Drives"`, rede por adaptador = alias, totais de rede `"Network"`, ping `"Latency"`.
+- Produces: `SensorHub.SampleReady` becomes `event Action` with a copy-on-write list; a handler that throws does not prevent the following ones; handler failures are logged at most once per minute.
+- Produces: `SensorHub.Start()` does not block: `InitializeProviders()` runs on the loop thread.
+- Produces: `Device` values: CPU total `"CPU"`, cores `"CPU cores"`, memory `"Memory"`, GPU `GpuAdapterInfo.Name`, disk `"Disk n (X:)"`, drives `"Drives"`, network per adapter = alias, network totals `"Network"`, ping `"Latency"`.
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
-Em `tests/Supermonitor.Tests/Sensors/FakeProvider.cs`, adicionar a propriedade e a espera no `Initialize`:
+In `tests/Supermonitor.Tests/Sensors/FakeProvider.cs`, add the property and the wait in `Initialize`:
 ```csharp
     public ManualResetEventSlim? InitializeGate { get; init; }
 ```
@@ -119,7 +119,7 @@ Em `tests/Supermonitor.Tests/Sensors/FakeProvider.cs`, adicionar a propriedade e
     }
 ```
 
-Adicionar em `SensorHubTests`:
+Add to `SensorHubTests`:
 ```csharp
     [Fact]
     public void Throwing_SampleReady_handler_does_not_block_later_handlers()
@@ -192,30 +192,30 @@ public sealed class LogTests : IDisposable
 }
 ```
 
-Em `ProviderSmokeTests`, no fim de `Cpu_provider_reports_total_and_per_core_usage`:
+At the end of `Cpu_provider_reports_total_and_per_core_usage` in `ProviderSmokeTests`:
 ```csharp
         Assert.True(store.TryGetDescriptor(MetricIds.CpuUsage, out var descriptor));
         Assert.Equal("CPU", descriptor!.Device);
 ```
-E no fim de `Gpu_provider_reports_usage_and_vram_for_first_gpu`:
+And at the end of `Gpu_provider_reports_usage_and_vram_for_first_gpu`:
 ```csharp
         Assert.True(store.TryGetDescriptor(MetricIds.GpuUsage(0), out var descriptor));
         Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests`
-Expected: compila; falham `Throwing_SampleReady_handler_does_not_block_later_handlers` (segundo handler não chamado), `Start_returns_before_slow_provider_initialization_finishes` (`returned` falso), `Initialize_skips_old_logs_it_cannot_delete` (`UnauthorizedAccessException`); os dois smoke tests falham por `Device` nulo — se a compilação falhar porque `Device` não existe, isso também conta como RED.
+Expected: compiles; `Throwing_SampleReady_handler_does_not_block_later_handlers` (second handler not called), `Start_returns_before_slow_provider_initialization_finishes` (`returned` false), `Initialize_skips_old_logs_it_cannot_delete` (`UnauthorizedAccessException`) fail; the two smoke tests fail because `Device` is null — if compilation fails because `Device` does not exist, that also counts as RED.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
-`src/Supermonitor.Core/Metrics/MetricUnit.cs` — trocar a linha do record:
+`src/Supermonitor.Core/Metrics/MetricUnit.cs` — replace the record line:
 ```csharp
 public sealed record MetricDescriptor(string Id, string DisplayName, MetricCategory Category, MetricUnit Unit, string? Device = null);
 ```
 
-`src/Supermonitor.Core/Diagnostics/Log.cs` — trocar o corpo do `try` em `Initialize`:
+`src/Supermonitor.Core/Diagnostics/Log.cs` — replace the body of the `try` in `Initialize`:
 ```csharp
         var names = Directory.EnumerateFiles(directory).Select(Path.GetFileName).OfType<string>();
         foreach (var name in LogRetention.FilesToDelete(names, DateOnly.FromDateTime(DateTime.Now), LogRetention.KeepDays).ToArray())
@@ -226,13 +226,13 @@ public sealed record MetricDescriptor(string Id, string DisplayName, MetricCateg
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // Arquivo antigo bloqueado ou somente leitura: fica para a próxima limpeza.
+                // Old file locked or read-only: left for the next cleanup.
             }
         }
 ```
-(remover o `try/catch (IOException)` externo; `Directory.EnumerateFiles` de um diretório recém-criado não falha).
+(remove the outer `try/catch (IOException)`; `Directory.EnumerateFiles` on a freshly created directory does not fail).
 
-`src/Supermonitor.Core/Sensors/SensorHub.cs` — campos, evento, `Start`, `RunAsync` e o final do `Tick`:
+`src/Supermonitor.Core/Sensors/SensorHub.cs` — fields, event, `Start`, `RunAsync` and the end of `Tick`:
 ```csharp
     private readonly Lock _handlersGate = new();
     private Action[] _handlers = [];
@@ -286,7 +286,7 @@ public sealed record MetricDescriptor(string Id, string DisplayName, MetricCateg
         }
     }
 ```
-No fim de `Tick`, substituir o bloco `try { SampleReady?.Invoke(); } catch ...` por:
+At the end of `Tick`, replace the `try { SampleReady?.Invoke(); } catch ...` block with:
 ```csharp
         foreach (var handler in Volatile.Read(ref _handlers))
         {
@@ -314,18 +314,18 @@ No fim de `Tick`, substituir o bloco `try { SampleReady?.Invoke(); } catch ...` 
         Log.Error("SampleReady handler failed", exception);
     }
 ```
-Remover a declaração antiga `public event Action? SampleReady;`.
+Remove the old declaration `public event Action? SampleReady;`.
 
-Provedores — passar `Device` em cada `MetricDescriptor`:
-- `CpuProvider`: total → `new MetricDescriptor(MetricIds.CpuUsage, "CPU usage", MetricCategory.Cpu, MetricUnit.Percent, "CPU")`; núcleos → mesmo construtor com `"CPU cores"` no fim.
+Providers — pass `Device` in each `MetricDescriptor`:
+- `CpuProvider`: total → `new MetricDescriptor(MetricIds.CpuUsage, "CPU usage", MetricCategory.Cpu, MetricUnit.Percent, "CPU")`; cores → same constructor with `"CPU cores"` at the end.
 - `MemoryProvider.Register`: `new MetricDescriptor(id, name, MetricCategory.Memory, unit, "Memory")`.
-- `GpuProvider.Register`, função local `Add`: `new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit, info.Name)`.
-- `DiskProvider`: o helper `Register` recebe `string device` e repassa; as quatro chamadas passam `title`.
+- `GpuProvider.Register`, local function `Add`: `new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit, info.Name)`.
+- `DiskProvider`: the `Register` helper receives `string device` and forwards it; the four calls pass `title`.
 - `DriveSpaceProvider.Register`: `new MetricDescriptor(id, name, MetricCategory.Disk, unit, "Drives")`.
-- `NetworkProvider.Register` recebe `string device`: adaptadores passam `alias`; totais passam `"Network"`.
-- `PingProvider`: os três descriptors recebem `"Latency"`.
+- `NetworkProvider.Register` receives `string device`: adapters pass `alias`; totals pass `"Network"`.
+- `PingProvider`: the three descriptors receive `"Latency"`.
 
-`src/Supermonitor/App.xaml.cs` — no construtor, depois de `UnhandledException += ...`:
+`src/Supermonitor/App.xaml.cs` — in the constructor, after `UnhandledException += ...`:
 ```csharp
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, e) =>
@@ -335,13 +335,13 @@ Provedores — passar `Device` em cada `MetricDescriptor`:
         };
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
 Run: `dotnet test --project tests/Supermonitor.Tests`
-Expected: todos passam (unidade + hardware).
+Expected: all pass (unit + hardware).
 
 Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -p:OutDir=<temp>\`
-Expected: `0 Erro(s)`.
+Expected: `0 Error(s)`.
 
 - [ ] **Step 5: Commit**
 
@@ -352,7 +352,7 @@ git commit -m "feat(core): isolate SampleReady handlers, init providers off the 
 
 ---
 
-### Task 2: DemandTracker e provedores sob demanda
+### Task 2: DemandTracker and on-demand providers
 
 **Files:**
 - Create: `src/Supermonitor.Core/Sensors/DemandTracker.cs`
@@ -360,11 +360,11 @@ git commit -m "feat(core): isolate SampleReady handlers, init providers off the 
 - Test: `tests/Supermonitor.Tests/Sensors/DemandTrackerTests.cs`, `SensorHubTests.cs`, `FakeProvider.cs`
 
 **Interfaces:**
-- Produces: `enum Demand { HardwareSensors, Processes }`; `DemandTracker` com `IDisposable Acquire(Demand)` (lease idempotente) e `bool IsActive(Demand)`.
-- Produces: `ISensorProvider.RequiredDemand` — `Demand? RequiredDemand => null;` (membro padrão).
-- Produces: `SensorHub(..., TimeSpan interval, DemandTracker? demand = null)`. Provedor com demanda inativa não é amostrado; ao ficar inativo suas métricas viram NaN uma vez; ao reativar, a primeira amostra recebe `elapsed = TimeSpan.Zero`.
+- Produces: `enum Demand { HardwareSensors, Processes }`; `DemandTracker` with `IDisposable Acquire(Demand)` (idempotent lease) and `bool IsActive(Demand)`.
+- Produces: `ISensorProvider.RequiredDemand` — `Demand? RequiredDemand => null;` (default member).
+- Produces: `SensorHub(..., TimeSpan interval, DemandTracker? demand = null)`. A provider with inactive demand is not sampled; when it becomes inactive its metrics turn NaN once; on reactivation, the first sample receives `elapsed = TimeSpan.Zero`.
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
 `tests/Supermonitor.Tests/Sensors/DemandTrackerTests.cs`:
 ```csharp
@@ -416,12 +416,12 @@ public class DemandTrackerTests
 }
 ```
 
-Em `FakeProvider`, adicionar:
+In `FakeProvider`, add:
 ```csharp
     public Demand? RequiredDemand { get; init; }
 ```
 
-Em `SensorHubTests`, adicionar `using Supermonitor.Core.Sensors;` (já existe) e:
+In `SensorHubTests`, add `using Supermonitor.Core.Sensors;` (already exists) and:
 ```csharp
     [Fact]
     public void Provider_without_active_demand_is_not_sampled_and_reads_nan()
@@ -467,12 +467,12 @@ Em `SensorHubTests`, adicionar `using Supermonitor.Core.Sensors;` (já existe) e
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação `DemandTracker`/`Demand` não encontrados.
+Expected: compile error `DemandTracker`/`Demand` not found.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Sensors/DemandTracker.cs`:
 ```csharp
@@ -511,15 +511,15 @@ public sealed class DemandTracker
 }
 ```
 
-`src/Supermonitor.Core/Sensors/ISensorProvider.cs` — dentro da interface:
+`src/Supermonitor.Core/Sensors/ISensorProvider.cs` — inside the interface:
 ```csharp
     Demand? RequiredDemand => null;
 ```
 
 `src/Supermonitor.Core/Sensors/SensorHub.cs`:
-- campo `private readonly DemandTracker _demand;`
-- construtor: `public SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval, DemandTracker? demand = null)` com `_demand = demand ?? new DemandTracker();`
-- em `Tick`, logo depois de `if (!slot.Available) continue;`:
+- field `private readonly DemandTracker _demand;`
+- constructor: `public SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval, DemandTracker? demand = null)` with `_demand = demand ?? new DemandTracker();`
+- in `Tick`, right after `if (!slot.Available) continue;`:
 ```csharp
             if (slot.Provider.RequiredDemand is { } required && !_demand.IsActive(required))
             {
@@ -533,9 +533,9 @@ public sealed class DemandTracker
             }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -546,7 +546,7 @@ git commit -m "feat(core): add demand tracker and demand-gated providers"
 
 ---
 
-### Task 3: Mapeamento de sensores LHM
+### Task 3: LHM sensor mapping
 
 **Files:**
 - Modify: `src/Supermonitor.Core/Supermonitor.Core.csproj`, `src/Supermonitor.Core/Metrics/MetricIds.cs`
@@ -554,20 +554,20 @@ git commit -m "feat(core): add demand tracker and demand-gated providers"
 - Test: `tests/Supermonitor.Tests/Sensors/HardwareSensorMapperTests.cs`
 
 **Interfaces:**
-- Produces: `MetricIds.CpuTemperature` (`"cpu.temp"`), `CpuPower` (`"cpu.power"`), `CpuClock` (`"cpu.clock"`), e por GPU `GpuTemperature(n)` (`"gpu{n}.temp"`), `GpuHotspot(n)` (`.hotspot`), `GpuMemoryTemperature(n)` (`.memtemp`), `GpuClock(n)` (`.clock`), `GpuMemoryClock(n)` (`.memclock`), `GpuPower(n)` (`.power`), `GpuFan(n)` (`.fan`), `GpuFanPercent(n)` (`.fanpct`).
+- Produces: `MetricIds.CpuTemperature` (`"cpu.temp"`), `CpuPower` (`"cpu.power"`), `CpuClock` (`"cpu.clock"`), and per GPU `GpuTemperature(n)` (`"gpu{n}.temp"`), `GpuHotspot(n)` (`.hotspot`), `GpuMemoryTemperature(n)` (`.memtemp`), `GpuClock(n)` (`.clock`), `GpuMemoryClock(n)` (`.memclock`), `GpuPower(n)` (`.power`), `GpuFan(n)` (`.fan`), `GpuFanPercent(n)` (`.fanpct`).
 - Produces: `HardwareSensorMapper.CategoryOf(HardwareType) -> MetricCategory?`, `UnitOf(SensorType) -> MetricUnit?`, `MetricId(string identifier) -> string` (`"hw" + identifier`), `WellKnown(HardwareType, SensorType, string name, int gpuIndex, int gpuCount) -> WellKnownMetric?`; `readonly record struct WellKnownMetric(string Id, string DisplayName)`.
 - Produces: `GpuIndexMatcher.Match(IReadOnlyList<string> adapterNames, string name, ICollection<int> used) -> int`.
 
-- [ ] **Step 1: Pacote**
+- [ ] **Step 1: Package**
 
-Em `src/Supermonitor.Core/Supermonitor.Core.csproj`, adicionar:
+In `src/Supermonitor.Core/Supermonitor.Core.csproj`, add:
 ```xml
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
   </ItemGroup>
 ```
 
-- [ ] **Step 2: Testes que falham**
+- [ ] **Step 2: Failing tests**
 
 `tests/Supermonitor.Tests/Sensors/HardwareSensorMapperTests.cs`:
 ```csharp
@@ -698,14 +698,14 @@ public class HardwareSensorMapperTests
 }
 ```
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [ ] **Step 3: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação `HardwareSensorMapper` não encontrado.
+Expected: compile error `HardwareSensorMapper` not found.
 
-- [ ] **Step 4: Implementar**
+- [ ] **Step 4: Implement**
 
-Em `MetricIds.cs`, adicionar:
+In `MetricIds.cs`, add:
 ```csharp
     public const string CpuTemperature = "cpu.temp";
     public const string CpuPower = "cpu.power";
@@ -748,7 +748,7 @@ public static class HardwareSensorMapper
         _ => null,
     };
 
-    // Carga, memória e tráfego já vêm de PDH/Win32; aqui só o que o Windows não expõe.
+    // Load, memory and traffic already come from PDH/Win32; here only what Windows does not expose.
     public static MetricUnit? UnitOf(SensorType type) => type switch
     {
         SensorType.Temperature => MetricUnit.Celsius,
@@ -789,7 +789,7 @@ public static class HardwareSensorMapper
 
 public static class GpuIndexMatcher
 {
-    // Alinha a GPU do LHM com o índice DXGI usado pelo GpuProvider (gpu{n}).
+    // Aligns the LHM GPU with the DXGI index used by GpuProvider (gpu{n}).
     public static int Match(IReadOnlyList<string> adapterNames, string name, ICollection<int> used)
     {
         for (var i = 0; i < adapterNames.Count; i++)
@@ -819,9 +819,9 @@ public static class GpuIndexMatcher
 }
 ```
 
-- [ ] **Step 5: Rodar e ver passar**
+- [ ] **Step 5: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
 
 - [ ] **Step 6: Commit**
 
@@ -832,7 +832,7 @@ git commit -m "feat(sensors): map LibreHardwareMonitor sensors to metrics and we
 
 ---
 
-### Task 4: HardwareProvider e demanda da janela
+### Task 4: HardwareProvider and window demand
 
 **Files:**
 - Create: `src/Supermonitor.Core/Sensors/Hardware/HardwareProvider.cs`
@@ -840,14 +840,14 @@ git commit -m "feat(sensors): map LibreHardwareMonitor sensors to metrics and we
 - Test: `tests/Supermonitor.Tests/Hardware/ProviderSmokeTests.cs`
 
 **Interfaces:**
-- Consumes: `HardwareSensorMapper`, `GpuIndexMatcher` (Task 3), `Demand` (Task 2), `DxgiAdapters`/`GpuAdapterFilter` (Plano 1).
-- Produces: `HardwareProvider(Func<IReadOnlyList<string>> gpuNames)`, `Name = "Hardware sensors"`, `RequiredDemand = Demand.HardwareSensors`, `static bool IsPawnIoInstalled`. Sensor com id conhecido é registrado só com o id conhecido; os demais com `hw/<identifier>`. Sensores `IsDefaultHidden` são ignorados.
+- Consumes: `HardwareSensorMapper`, `GpuIndexMatcher` (Task 3), `Demand` (Task 2), `DxgiAdapters`/`GpuAdapterFilter` (Plan 1).
+- Produces: `HardwareProvider(Func<IReadOnlyList<string>> gpuNames)`, `Name = "Hardware sensors"`, `RequiredDemand = Demand.HardwareSensors`, `static bool IsPawnIoInstalled`. A sensor with a known id is registered only under the known id; the others under `hw/<identifier>`. `IsDefaultHidden` sensors are ignored.
 - Produces: `AppHost.Demand` (`DemandTracker`), `static IReadOnlyList<string> AppHost.MonitoredGpuNames()`.
-- Produces: `MainWindow` segura `Demand.HardwareSensors` enquanto existe e não está minimizada.
+- Produces: `MainWindow` holds `Demand.HardwareSensors` while it exists and is not minimized.
 
-- [ ] **Step 1: Teste de hardware que falha**
+- [ ] **Step 1: Failing hardware test**
 
-Em `ProviderSmokeTests`, adicionar `using Supermonitor.Core;` e `using Supermonitor.Core.Sensors.Hardware;` e:
+In `ProviderSmokeTests`, add `using Supermonitor.Core;` and `using Supermonitor.Core.Sensors.Hardware;` and:
 ```csharp
     [Fact]
     public void Hardware_provider_reports_gpu_temperature()
@@ -862,9 +862,9 @@ Em `ProviderSmokeTests`, adicionar `using Supermonitor.Core;` e `using Supermoni
 ```
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-trait "Category=Hardware"`
-Expected: erro de compilação `HardwareProvider` não encontrado.
+Expected: compile error `HardwareProvider` not found.
 
-- [ ] **Step 2: Implementar o provedor**
+- [ ] **Step 2: Implement the provider**
 
 `src/Supermonitor.Core/Sensors/Hardware/HardwareProvider.cs`:
 ```csharp
@@ -967,12 +967,12 @@ public sealed class HardwareProvider(Func<IReadOnlyList<string>> gpuNames) : ISe
 }
 ```
 
-- [ ] **Step 3: Composição**
+- [ ] **Step 3: Composition**
 
-Em `AppHost.cs`:
+In `AppHost.cs`:
 - `using Supermonitor.Core.Sensors.Hardware;`
-- propriedade `public DemandTracker Demand { get; }` (no construtor privado, novo parâmetro `DemandTracker demand`).
-- método:
+- property `public DemandTracker Demand { get; }` (in the private constructor, new parameter `DemandTracker demand`).
+- method:
 ```csharp
     public static IReadOnlyList<string> MonitoredGpuNames() =>
         DxgiAdapters.Enumerate()
@@ -980,18 +980,18 @@ Em `AppHost.cs`:
             .Select(a => a.Name)
             .ToArray();
 ```
-- em `Create`: `var demand = new DemandTracker();`, inserir `new HardwareProvider(MonitoredGpuNames),` logo depois de `new GpuProvider(),` e criar o hub com `new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs), demand)`; passar `demand` ao construtor.
+- in `Create`: `var demand = new DemandTracker();`, insert `new HardwareProvider(MonitoredGpuNames),` right after `new GpuProvider(),` and create the hub with `new SensorHub(metrics, providers, TimeProvider.System, TimeSpan.FromMilliseconds(settings.Current.SampleIntervalMs), demand)`; pass `demand` to the constructor.
 
-Em `src/Supermonitor/MainWindow.xaml.cs`:
+In `src/Supermonitor/MainWindow.xaml.cs`:
 ```csharp
     private IDisposable? _sensorLease;
 ```
-No fim do construtor:
+At the end of the constructor:
 ```csharp
         Closed += (_, _) => ReleaseSensorLease();
         UpdateSensorLease();
 ```
-Em `OnAppWindowChanged`, dentro do `if (minimized != _lastMinimized)`, depois de `SetEfficiencyMode`, chamar `UpdateSensorLease();`. Métodos:
+In `OnAppWindowChanged`, inside the `if (minimized != _lastMinimized)`, after `SetEfficiencyMode`, call `UpdateSensorLease();`. Methods:
 ```csharp
     private void UpdateSensorLease()
     {
@@ -1013,10 +1013,10 @@ Em `OnAppWindowChanged`, dentro do `if (minimized != _lastMinimized)`, depois de
 ```
 (`using Supermonitor.Core.Sensors;`).
 
-- [ ] **Step 4: Rodar testes e build**
+- [ ] **Step 4: Run tests and build**
 
-Run: `dotnet test --project tests/Supermonitor.Tests` → todos passam (o teste de hardware lê a temperatura da RX 9070 XT sem elevação).
-Run: build do app com `-p:OutDir=<temp>\` → `0 Erro(s)`.
+Run: `dotnet test --project tests/Supermonitor.Tests` → all pass (the hardware test reads the RX 9070 XT temperature without elevation).
+Run: app build with `-p:OutDir=<temp>\` → `0 Error(s)`.
 
 - [ ] **Step 5: Commit**
 
@@ -1027,7 +1027,7 @@ git commit -m "feat(sensors): add LibreHardwareMonitor provider gated by dashboa
 
 ---
 
-### Task 5: Processos e uso de GPU por processo
+### Task 5: Processes and per-process GPU usage
 
 **Files:**
 - Modify: `src/Supermonitor.Core/Sensors/Gpu/GpuEngineAggregator.cs`, `src/Supermonitor.Core/Sensors/Gpu/GpuProvider.cs`, `src/Supermonitor.Core/Interop/Ntdll.cs`, `src/Supermonitor.Core/AppHost.cs`
@@ -1035,15 +1035,15 @@ git commit -m "feat(sensors): add LibreHardwareMonitor provider gated by dashboa
 - Test: `tests/Supermonitor.Tests/Sensors/GpuEngineAggregatorTests.cs`, `SystemProcessParserTests.cs`, `ProcessTrackerTests.cs`; `Hardware/ProviderSmokeTests.cs`
 
 **Interfaces:**
-- Produces: `GpuEngineAggregator.CopyProcessUsage(Dictionary<int, float> target)` (uso por PID = maior engine, limitado a 100).
-- Produces: `ProcessGpuUsage` com `Publish(GpuEngineAggregator)` e `float Get(int pid)` (0 se ausente); `GpuProvider(ProcessGpuUsage? processUsage = null)`.
+- Produces: `GpuEngineAggregator.CopyProcessUsage(Dictionary<int, float> target)` (per-PID usage = busiest engine, capped at 100).
+- Produces: `ProcessGpuUsage` with `Publish(GpuEngineAggregator)` and `float Get(int pid)` (0 if absent); `GpuProvider(ProcessGpuUsage? processUsage = null)`.
 - Produces: `readonly record struct RawProcessEntry(int ProcessId, long CreateTime, long CpuTime, long PrivateWorkingSet, nint NamePointer, int NameChars)`; `SystemProcessParser.EntrySize` (0x100), `Parse(byte* buffer, int length, List<RawProcessEntry> output)`, `string? ReadName(RawProcessEntry)`.
 - Produces: `readonly record struct ProcessSample(int ProcessId, string Name, float CpuPercent, long PrivateBytes, float GpuPercent)`; `ProcessCpuCalculator.Percent(long previous, long current, TimeSpan elapsed, int processorCount) -> double`; `ProcessTracker.Update(IReadOnlyList<RawProcessEntry>, TimeSpan elapsed, int processorCount, Func<RawProcessEntry, string> resolveName, Func<int, float> gpuPercent) -> ProcessSample[]`.
-- Produces: `ProcessMonitor(ProcessGpuUsage)` com `Name = "Processes"`, `RequiredDemand = Demand.Processes`, `IReadOnlyList<ProcessSample> Snapshot`; `AppHost.Processes`.
+- Produces: `ProcessMonitor(ProcessGpuUsage)` with `Name = "Processes"`, `RequiredDemand = Demand.Processes`, `IReadOnlyList<ProcessSample> Snapshot`; `AppHost.Processes`.
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
-Em `GpuEngineAggregatorTests`, adicionar:
+In `GpuEngineAggregatorTests`, add:
 ```csharp
     [Fact]
     public void Per_process_usage_takes_the_busiest_engine_of_each_pid()
@@ -1238,7 +1238,7 @@ public class ProcessTrackerTests
 }
 ```
 
-Em `ProviderSmokeTests` (`using Supermonitor.Core.Sensors.Gpu;` já existe; adicionar `using Supermonitor.Core.Sensors.Processes;`):
+In `ProviderSmokeTests` (`using Supermonitor.Core.Sensors.Gpu;` already exists; add `using Supermonitor.Core.Sensors.Processes;`):
 ```csharp
     [Fact]
     public void Process_monitor_lists_this_process_with_cpu_usage()
@@ -1252,24 +1252,24 @@ Em `ProviderSmokeTests` (`using Supermonitor.Core.Sensors.Gpu;` já existe; adic
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (`CopyProcessUsage`, `SystemProcessParser`, `ProcessTracker` não encontrados).
+Expected: compile error (`CopyProcessUsage`, `SystemProcessParser`, `ProcessTracker` not found).
 
-- [ ] **Step 3: Implementar agregação por PID**
+- [ ] **Step 3: Implement per-PID aggregation**
 
-Em `GpuEngineAggregator.cs`:
-- campo `private readonly Dictionary<int, double> _processes = [];`
-- em `Reset()`, adicionar `_processes.Clear();`
-- em `Add`, depois de `_matched[adapter] = true;`:
+In `GpuEngineAggregator.cs`:
+- field `private readonly Dictionary<int, double> _processes = [];`
+- in `Reset()`, add `_processes.Clear();`
+- in `Add`, after `_matched[adapter] = true;`:
 ```csharp
         if (TryParsePid(instanceName, out var pid))
         {
             _processes[pid] = Math.Max(_processes.GetValueOrDefault(pid), value);
         }
 ```
-- métodos:
+- methods:
 ```csharp
     public void CopyProcessUsage(Dictionary<int, float> target)
     {
@@ -1323,11 +1323,11 @@ public sealed class ProcessGpuUsage
 }
 ```
 
-`GpuProvider`: virar `public sealed class GpuProvider(ProcessGpuUsage? processUsage = null) : ISensorProvider` e, em `Sample`, logo depois do laço que alimenta o agregador: `processUsage?.Publish(_aggregator);`.
+`GpuProvider`: change to `public sealed class GpuProvider(ProcessGpuUsage? processUsage = null) : ISensorProvider` and, in `Sample`, right after the loop that feeds the aggregator: `processUsage?.Publish(_aggregator);`.
 
-- [ ] **Step 4: Implementar parser, tracker e monitor**
+- [ ] **Step 4: Implement parser, tracker and monitor**
 
-Em `Ntdll.cs`, adicionar `public const int SystemProcessInformation = 5;`.
+In `Ntdll.cs`, add `public const int SystemProcessInformation = 5;`.
 
 `src/Supermonitor.Core/Sensors/Processes/SystemProcessParser.cs`:
 ```csharp
@@ -1335,7 +1335,7 @@ namespace Supermonitor.Core.Sensors.Processes;
 
 public readonly record struct RawProcessEntry(int ProcessId, long CreateTime, long CpuTime, long PrivateWorkingSet, nint NamePointer, int NameChars);
 
-// Layout x64 de SYSTEM_PROCESS_INFORMATION (0x100 bytes, seguido pelas threads).
+// x64 layout of SYSTEM_PROCESS_INFORMATION (0x100 bytes, followed by the threads).
 public static unsafe class SystemProcessParser
 {
     public const int EntrySize = 0x100;
@@ -1378,7 +1378,7 @@ public readonly record struct ProcessSample(int ProcessId, string Name, float Cp
 
 public static class ProcessCpuCalculator
 {
-    // Tempos em unidades de 100 ns; percentual sobre todos os núcleos lógicos (igual ao Gerenciador de Tarefas).
+    // Times in 100 ns units; percentage over all logical cores (same as Task Manager).
     public static double Percent(long previous, long current, TimeSpan elapsed, int processorCount)
     {
         if (elapsed <= TimeSpan.Zero || processorCount <= 0)
@@ -1524,11 +1524,11 @@ public sealed unsafe class ProcessMonitor(ProcessGpuUsage gpuUsage) : ISensorPro
 }
 ```
 
-Em `AppHost.cs`: `var processGpu = new ProcessGpuUsage(); var processes = new ProcessMonitor(processGpu);`, trocar `new GpuProvider()` por `new GpuProvider(processGpu)` e adicionar `processes` como último provedor; propriedade `public ProcessMonitor Processes { get; }` (novo parâmetro do construtor privado).
+In `AppHost.cs`: `var processGpu = new ProcessGpuUsage(); var processes = new ProcessMonitor(processGpu);`, replace `new GpuProvider()` with `new GpuProvider(processGpu)` and add `processes` as the last provider; property `public ProcessMonitor Processes { get; }` (new parameter of the private constructor).
 
-- [ ] **Step 5: Rodar e ver passar**
+- [ ] **Step 5: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests` → todos passam.
+Run: `dotnet test --project tests/Supermonitor.Tests` → all pass.
 
 - [ ] **Step 6: Commit**
 
@@ -1539,25 +1539,25 @@ git commit -m "feat(sensors): add process monitor with per-process CPU, memory a
 
 ---
 
-### Task 6: Configurações v2
+### Task 6: Settings v2
 
 **Files:**
 - Create: `src/Supermonitor.Core/Settings/CardSettings.cs`, `src/Supermonitor.Core/Settings/ColorText.cs`
 - Modify: `src/Supermonitor.Core/Settings/AppSettings.cs`, `SettingsMigrator.cs`, `SettingsJsonContext.cs`
 - Modify: `src/Supermonitor/ViewModels/OverviewViewModel.cs`
-- Test: `tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` (reescrever), `SettingsMigratorTests.cs`, `ColorTextTests.cs`, `SettingsStoreTests.cs`
+- Test: `tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` (rewrite), `SettingsMigratorTests.cs`, `ColorTextTests.cs`, `SettingsStoreTests.cs`
 
 **Interfaces:**
 - Produces: `enum AppTheme { System, Light, Dark }`, `enum BackdropKind { Mica, MicaAlt, Acrylic, Solid }`, `enum CardSize { Compact, Normal, Large }`, `enum ChartKind { Line, Area, Bar }`.
 - Produces: `CardSettings { string MetricId; CardSize Size = Normal; ChartKind Chart = Line }`, `MetricThreshold { float Warning; float Critical }`.
-- Produces: `AppSettings` v2: `Version` (2), `SampleIntervalMs`, `PingHost`, `StartMinimized`, `List<CardSettings> Cards`, `int HistoryMinutes` (1/5/10), `AppTheme Theme`, `string? AccentColor` (`#RRGGBB` ou null = cor do Windows), `BackdropKind Backdrop`, `bool NetworkInBits`, `bool Fahrenheit`, `Dictionary<string, MetricThreshold> Thresholds`; `static IReadOnlyList<int> AllowedHistoryMinutes`; `static List<CardSettings> DefaultCards()`; `static Dictionary<string, MetricThreshold> DefaultThresholds()`; `UnitOptions ToUnitOptions()`; `Normalize()`.
+- Produces: `AppSettings` v2: `Version` (2), `SampleIntervalMs`, `PingHost`, `StartMinimized`, `List<CardSettings> Cards`, `int HistoryMinutes` (1/5/10), `AppTheme Theme`, `string? AccentColor` (`#RRGGBB` or null = Windows color), `BackdropKind Backdrop`, `bool NetworkInBits`, `bool Fahrenheit`, `Dictionary<string, MetricThreshold> Thresholds`; `static IReadOnlyList<int> AllowedHistoryMinutes`; `static List<CardSettings> DefaultCards()`; `static Dictionary<string, MetricThreshold> DefaultThresholds()`; `UnitOptions ToUnitOptions()`; `Normalize()`.
 - Produces: `SettingsMigrator.CurrentVersion = 2`; v1 `overviewCards: [id]` → `cards: [{ metricId }]`.
-- Produces: `ColorText.TryParseRgb(string?, out byte r, out byte g, out byte b)`, `ColorText.ToHex(byte r, byte g, byte b)` (`"#RRGGBB"` maiúsculo).
-- Enums gravados como string (`"theme": "Dark"`).
+- Produces: `ColorText.TryParseRgb(string?, out byte r, out byte g, out byte b)`, `ColorText.ToHex(byte r, byte g, byte b)` (`"#RRGGBB"` upper case).
+- Enums saved as strings (`"theme": "Dark"`).
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
-`tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` (substituir o arquivo):
+`tests/Supermonitor.Tests/Settings/AppSettingsTests.cs` (replace the file):
 ```csharp
 using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Settings;
@@ -1751,7 +1751,7 @@ public class ColorTextTests
 }
 ```
 
-Em `SettingsStoreTests`, adicionar:
+In `SettingsStoreTests`, add:
 ```csharp
     [Fact]
     public void Enums_are_saved_as_strings_and_v1_files_load_their_cards()
@@ -1770,12 +1770,12 @@ Em `SettingsStoreTests`, adicionar:
     }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (`CardSettings`, `AppTheme`, `ColorText` não encontrados).
+Expected: compile error (`CardSettings`, `AppTheme`, `ColorText` not found).
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Settings/CardSettings.cs`:
 ```csharp
@@ -1852,7 +1852,7 @@ public static class ColorText
 }
 ```
 
-`src/Supermonitor.Core/Settings/AppSettings.cs` (substituir):
+`src/Supermonitor.Core/Settings/AppSettings.cs` (replace):
 ```csharp
 using Supermonitor.Core.Metrics;
 
@@ -1961,7 +1961,7 @@ public sealed class AppSettings
 }
 ```
 
-`src/Supermonitor.Core/Settings/SettingsMigrator.cs` (substituir):
+`src/Supermonitor.Core/Settings/SettingsMigrator.cs` (replace):
 ```csharp
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -1976,13 +1976,13 @@ public static class SettingsMigrator
     {
         var version = root["version"]?.GetValue<int>() ?? 0;
 
-        // v0 → v1: arquivos sem número de versão. Nenhum campo mudou.
+        // v0 → v1: files without a version number. No field changed.
         if (version < 1)
         {
             version = 1;
         }
 
-        // v1 → v2: "overviewCards": ["id"] vira "cards": [{ "metricId": "id" }].
+        // v1 → v2: "overviewCards": ["id"] becomes "cards": [{ "metricId": "id" }].
         if (version < 2)
         {
             if (root["overviewCards"] is JsonArray ids)
@@ -2020,7 +2020,7 @@ namespace Supermonitor.Core.Settings;
 internal sealed partial class SettingsJsonContext : JsonSerializerContext;
 ```
 
-Em `src/Supermonitor/ViewModels/OverviewViewModel.cs`, trocar o laço do construtor por:
+In `src/Supermonitor/ViewModels/OverviewViewModel.cs`, replace the constructor loop with:
 ```csharp
         foreach (var card in host.Settings.Current.Cards)
         {
@@ -2028,10 +2028,10 @@ Em `src/Supermonitor/ViewModels/OverviewViewModel.cs`, trocar o laço do constru
         }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
-Run: build do app com `-p:OutDir=<temp>\` → `0 Erro(s)`.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
+Run: app build with `-p:OutDir=<temp>\` → `0 Error(s)`.
 
 - [ ] **Step 5: Commit**
 
@@ -2042,17 +2042,17 @@ git commit -m "feat(settings): schema v2 with card layout, appearance, units and
 
 ---
 
-### Task 7: Edição do dashboard e limiares
+### Task 7: Dashboard editing and thresholds
 
 **Files:**
 - Create: `src/Supermonitor.Core/Dashboard/DashboardEditor.cs`, `src/Supermonitor.Core/Dashboard/ThresholdEvaluator.cs`
 - Test: `tests/Supermonitor.Tests/Dashboard/DashboardEditorTests.cs`, `ThresholdEvaluatorTests.cs`
 
 **Interfaces:**
-- Produces: `DashboardEditor.IndexOf(List<CardSettings>, string id) -> int`, `Add(...) -> bool` (false se já existe), `Remove(...) -> bool`, `MoveTo(cards, id, newIndex) -> int` (índice final, -1 se ausente, limitado à faixa), `MoveBy(cards, id, delta) -> int`.
+- Produces: `DashboardEditor.IndexOf(List<CardSettings>, string id) -> int`, `Add(...) -> bool` (false if it already exists), `Remove(...) -> bool`, `MoveTo(cards, id, newIndex) -> int` (final index, -1 if absent, clamped to the range), `MoveBy(cards, id, delta) -> int`.
 - Produces: `enum ThresholdLevel { Normal, Warning, Critical }`; `ThresholdEvaluator.Evaluate(float value, MetricThreshold? threshold) -> ThresholdLevel`.
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
 `tests/Supermonitor.Tests/Dashboard/DashboardEditorTests.cs`:
 ```csharp
@@ -2142,12 +2142,12 @@ public class ThresholdEvaluatorTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação `Supermonitor.Core.Dashboard` não existe.
+Expected: compile error `Supermonitor.Core.Dashboard` does not exist.
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Dashboard/DashboardEditor.cs`:
 ```csharp
@@ -2237,9 +2237,9 @@ public static class ThresholdEvaluator
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -2250,18 +2250,18 @@ git commit -m "feat(dashboard): add card editing and threshold evaluation"
 
 ---
 
-### Task 8: Amostragem de gráfico, composição de memória e ordenação de processos
+### Task 8: Chart sampling, memory composition and process sorting
 
 **Files:**
 - Create: `src/Supermonitor.Core/Dashboard/ChartSampler.cs`, `src/Supermonitor.Core/Dashboard/MemoryComposition.cs`, `src/Supermonitor.Core/Sensors/Processes/ProcessSorting.cs`
 - Test: `tests/Supermonitor.Tests/Dashboard/ChartSamplerTests.cs`, `MemoryCompositionTests.cs`, `tests/Supermonitor.Tests/Sensors/ProcessSortingTests.cs`
 
 **Interfaces:**
-- Produces: `ChartSampler.Downsample(ReadOnlySpan<float> source, Span<float> destination) -> int` (cópia direta se couber; senão máximo finito por balde, NaN se o balde não tem valor finito), `ChartSampler.Maximum(ReadOnlySpan<float> values, float? fixedMaximum) -> float` (fixo, ou maior finito × 1,1, ou 1).
-- Produces: `readonly record struct MemoryComposition(double InUse, double Modified, double Standby, double Free)` com `static MemoryComposition From(double total, double used, double modified, double standby, double free)`. Sem listas de memória (NaN): `Standby = 0`, `Free = total − used`, `Modified = 0`.
-- Produces: `enum ProcessSortKey { Cpu, Memory, Gpu, Name }`; `ProcessSorting.Top(IReadOnlyList<ProcessSample>, ProcessSortKey, string? filter, int count) -> ProcessSample[]` (desempate por PID).
+- Produces: `ChartSampler.Downsample(ReadOnlySpan<float> source, Span<float> destination) -> int` (direct copy if it fits; otherwise finite maximum per bucket, NaN if the bucket has no finite value), `ChartSampler.Maximum(ReadOnlySpan<float> values, float? fixedMaximum) -> float` (fixed, or largest finite × 1.1, or 1).
+- Produces: `readonly record struct MemoryComposition(double InUse, double Modified, double Standby, double Free)` with `static MemoryComposition From(double total, double used, double modified, double standby, double free)`. Without memory lists (NaN): `Standby = 0`, `Free = total − used`, `Modified = 0`.
+- Produces: `enum ProcessSortKey { Cpu, Memory, Gpu, Name }`; `ProcessSorting.Top(IReadOnlyList<ProcessSample>, ProcessSortKey, string? filter, int count) -> ProcessSample[]` (tie-break by PID).
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
 `tests/Supermonitor.Tests/Dashboard/ChartSamplerTests.cs`:
 ```csharp
@@ -2395,12 +2395,12 @@ public class ProcessSortingTests
 }
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Run and see it fail**
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação (`ChartSampler`, `MemoryComposition`, `ProcessSorting` não encontrados).
+Expected: compile error (`ChartSampler`, `MemoryComposition`, `ProcessSorting` not found).
 
-- [ ] **Step 3: Implementar**
+- [ ] **Step 3: Implement**
 
 `src/Supermonitor.Core/Dashboard/ChartSampler.cs`:
 ```csharp
@@ -2408,7 +2408,7 @@ namespace Supermonitor.Core.Dashboard;
 
 public static class ChartSampler
 {
-    // Reduz a série para a largura do gráfico guardando o pico de cada balde (picos importam para gamers).
+    // Reduces the series to the chart width keeping the peak of each bucket (peaks matter for gamers).
     public static int Downsample(ReadOnlySpan<float> source, Span<float> destination)
     {
         if (destination.IsEmpty)
@@ -2525,9 +2525,9 @@ public static class ProcessSorting
 }
 ```
 
-- [ ] **Step 4: Rodar e ver passar**
+- [ ] **Step 4: Run and see it pass**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
 
 - [ ] **Step 5: Commit**
 
@@ -2538,7 +2538,7 @@ git commit -m "feat(dashboard): add chart downsampling, memory composition and p
 
 ---
 
-### Task 9: Gráfico, layout e card com tamanho, tipo e limiar
+### Task 9: Chart, layout and card with size, kind and threshold
 
 **Files:**
 - Create: `src/Supermonitor/Appearance/AccentPalette.cs`, `src/Supermonitor/Controls/TimeSeriesChart.cs`, `src/Supermonitor/Controls/CardWrapLayout.cs`, `src/Supermonitor/Controls/CardMetrics.cs`, `src/Supermonitor/ViewModels/ICardActions.cs`
@@ -2549,12 +2549,12 @@ git commit -m "feat(dashboard): add chart downsampling, memory composition and p
 - Consumes: `ChartSampler` (Task 8), `ThresholdEvaluator` (Task 7), `CardSize`, `ChartKind`, `MetricThreshold` (Task 6).
 - Produces: `AccentPalette.Current` (`Windows.UI.Color`), `AccentPalette.Set(Color)`, `event Action? AccentPalette.Changed`.
 - Produces: `TimeSeriesChart` (`Source`, `Kind`), `CardWrapLayout` (`Spacing`), `CardMetrics.Width(CardSize)`, `Height(CardSize)`, `ChartVisibility(CardSize)`.
-- Produces: `ICardActions` com `Remove(card)`, `Move(card, int delta)`, `MoveTo(string id, string targetId)`, `SetSize(card, CardSize)`, `SetChart(card, ChartKind)`, `MetricThreshold? GetThreshold(string id)`, `SetThreshold(string id, MetricThreshold?)`.
-- Produces: `MetricCardViewModel` com `Size`, `Chart`, `Level`, `IsEditing` (observáveis), `ICardActions? Actions { get; init; }`, `Refresh(UnitOptions options, MetricThreshold? threshold)`.
+- Produces: `ICardActions` with `Remove(card)`, `Move(card, int delta)`, `MoveTo(string id, string targetId)`, `SetSize(card, CardSize)`, `SetChart(card, ChartKind)`, `MetricThreshold? GetThreshold(string id)`, `SetThreshold(string id, MetricThreshold?)`.
+- Produces: `MetricCardViewModel` with `Size`, `Chart`, `Level`, `IsEditing` (observable), `ICardActions? Actions { get; init; }`, `Refresh(UnitOptions options, MetricThreshold? threshold)`.
 
-Componentes de UI sem lógica testável isolada: a lógica de amostragem e limiar já está coberta nas Tasks 7 e 8. A verificação desta task é build + execução.
+UI components without isolated testable logic: the sampling and threshold logic is already covered in Tasks 7 and 8. This task's verification is build + run.
 
-- [ ] **Step 1: Paleta, layout e métricas de card**
+- [ ] **Step 1: Palette, layout and card metrics**
 
 `src/Supermonitor/Appearance/AccentPalette.cs`:
 ```csharp
@@ -2613,7 +2613,7 @@ using Windows.Foundation;
 
 namespace Supermonitor.Controls;
 
-// Fluxo da esquerda para a direita; quebra de linha quando o próximo card não cabe.
+// Flows left to right; wraps to a new row when the next card does not fit.
 public sealed partial class CardWrapLayout : NonVirtualizingLayout
 {
     public double Spacing { get; set; } = 12;
@@ -2657,7 +2657,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
 }
 ```
 
-- [ ] **Step 2: Gráfico**
+- [ ] **Step 2: Chart**
 
 `src/Supermonitor/Controls/TimeSeriesChart.cs`:
 ```csharp
@@ -2782,7 +2782,7 @@ public sealed partial class TimeSeriesChart : UserControl
             return;
         }
 
-        // A janela inteira (count pontos) ocupa a largura; a série fica alinhada à direita.
+        // The whole window (count points) fills the width; the series is right-aligned.
         var slots = Math.Max(2, Math.Min(count, (int)width));
         var visibleSlots = Math.Max(2, (int)Math.Ceiling((double)n * slots / count));
         if (_plot.Length < visibleSlots)
@@ -2856,9 +2856,9 @@ public sealed partial class TimeSeriesChart : UserControl
 }
 ```
 
-Apagar `src/Supermonitor/Controls/SparklineChart.cs`.
+Delete `src/Supermonitor/Controls/SparklineChart.cs`.
 
-- [ ] **Step 3: ViewModel do card e ações**
+- [ ] **Step 3: Card ViewModel and actions**
 
 `src/Supermonitor/ViewModels/ICardActions.cs`:
 ```csharp
@@ -2884,7 +2884,7 @@ public interface ICardActions
 }
 ```
 
-`src/Supermonitor/ViewModels/MetricCardViewModel.cs` (substituir):
+`src/Supermonitor/ViewModels/MetricCardViewModel.cs` (replace):
 ```csharp
 using CommunityToolkit.Mvvm.ComponentModel;
 using Supermonitor.Controls;
@@ -2959,7 +2959,7 @@ public sealed partial class MetricCardViewModel : ObservableObject, ISeriesSourc
 }
 ```
 
-Em `OverviewViewModel.RefreshNow`, trocar o laço por (a customização completa vem na Task 11):
+In `OverviewViewModel.RefreshNow`, replace the loop with (full customization comes in Task 11):
 ```csharp
         var settings = _host.Settings.Current;
         var points = Math.Max(2, 60_000 / settings.SampleIntervalMs);
@@ -2973,7 +2973,7 @@ Em `OverviewViewModel.RefreshNow`, trocar o laço por (a customização completa
 
 - [ ] **Step 4: Card**
 
-`src/Supermonitor/Controls/MetricCard.xaml` (substituir):
+`src/Supermonitor/Controls/MetricCard.xaml` (replace):
 ```xml
 <UserControl
     x:Class="Supermonitor.Controls.MetricCard"
@@ -3053,7 +3053,7 @@ Em `OverviewViewModel.RefreshNow`, trocar o laço por (a customização completa
 </UserControl>
 ```
 
-`src/Supermonitor/Controls/MetricCard.xaml.cs` (substituir):
+`src/Supermonitor/Controls/MetricCard.xaml.cs` (replace):
 ```csharp
 using System.ComponentModel;
 using Microsoft.UI.Xaml;
@@ -3241,7 +3241,7 @@ public sealed partial class MetricCard : UserControl
 }
 ```
 
-`ThresholdDialog` é usado aqui e criado neste passo para o projeto compilar. `src/Supermonitor/Dialogs/ThresholdDialog.cs`:
+`ThresholdDialog` is used here and created in this step so the project compiles. `src/Supermonitor/Dialogs/ThresholdDialog.cs`:
 ```csharp
 using Microsoft.UI.Xaml.Controls;
 using Supermonitor.Core.Settings;
@@ -3295,13 +3295,13 @@ public sealed partial class ThresholdDialog : ContentDialog
 }
 ```
 
-Em `src/Supermonitor/Views/OverviewPage.xaml`, trocar o `<UniformGridLayout ... />` por `<controls:CardWrapLayout Spacing="12" />`.
+In `src/Supermonitor/Views/OverviewPage.xaml`, replace the `<UniformGridLayout ... />` with `<controls:CardWrapLayout Spacing="12" />`.
 
-- [ ] **Step 5: Build e verificação**
+- [ ] **Step 5: Build and verification**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
-Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -p:OutDir=<temp>\` → `0 Erro(s)`.
-Se `x:Bind` de função com `ViewModel` nulo gerar erro de compilação XAML, trocar `Width`/`Height`/`Visibility` por atribuição em `ApplyState()` (`Width = CardMetrics.Width(vm?.Size ?? CardSize.Normal)` etc.) e registrar a decisão.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
+Run: `dotnet build src/Supermonitor/Supermonitor.csproj -c Debug -p:Platform=x64 -p:OutDir=<temp>\` → `0 Error(s)`.
+If a function `x:Bind` with a null `ViewModel` causes a XAML compile error, replace `Width`/`Height`/`Visibility` with assignment in `ApplyState()` (`Width = CardMetrics.Width(vm?.Size ?? CardSize.Normal)` etc.) and record the decision.
 
 - [ ] **Step 6: Commit**
 
@@ -3312,7 +3312,7 @@ git commit -m "feat(app): add chart kinds, card sizes, threshold colors and wrap
 
 ---
 
-### Task 10: Aparência, banner PawnIO e reinício
+### Task 10: Appearance, PawnIO banner and restart
 
 **Files:**
 - Create: `src/Supermonitor.Core/Shell/RestartArguments.cs`, `src/Supermonitor.Core/Sensors/Hardware/PawnIoInstaller.cs`, `src/Supermonitor/Appearance/AppearanceService.cs`
@@ -3321,11 +3321,11 @@ git commit -m "feat(app): add chart kinds, card sizes, threshold colors and wrap
 
 **Interfaces:**
 - Produces: `RestartArguments.WaitForPid` (`"--wait-for-pid"`), `string[] Build(int processId)`, `bool TryGetWaitPid(IReadOnlyList<string> args, out int processId)`.
-- Produces: `PawnIoInstaller.InstallAsync(CancellationToken) -> Task<int>` (código de saída do winget).
+- Produces: `PawnIoInstaller.InstallAsync(CancellationToken) -> Task<int>` (winget exit code).
 - Produces: `AppearanceService.Apply(Window, Panel root, AppSettings)`, `AppearanceService.NotifyChanged()`, `event Action? AppearanceService.Changed`.
-- Produces: `App.Restart()`, `App.ConsumeSettingsWarning() -> bool` (true só na primeira chamada), `App.PawnIoBannerDismissed`.
+- Produces: `App.Restart()`, `App.ConsumeSettingsWarning() -> bool` (true only on the first call), `App.PawnIoBannerDismissed`.
 
-- [ ] **Step 1: Testes que falham**
+- [ ] **Step 1: Failing tests**
 
 `tests/Supermonitor.Tests/Shell/RestartArgumentsTests.cs`:
 ```csharp
@@ -3358,7 +3358,7 @@ public class RestartArgumentsTests
 ```
 
 Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"`
-Expected: erro de compilação `RestartArguments` não encontrado.
+Expected: compile error `RestartArguments` not found.
 
 - [ ] **Step 2: Core**
 
@@ -3414,18 +3414,18 @@ public static class PawnIoInstaller
 }
 ```
 
-Run os testes → passam.
+Run the tests → they pass.
 
-- [ ] **Step 3: Program, App e aparência**
+- [ ] **Step 3: Program, App and appearance**
 
-`src/Supermonitor/Program.cs` — antes de `SingleInstance.TryAcquire`:
+`src/Supermonitor/Program.cs` — before `SingleInstance.TryAcquire`:
 ```csharp
         if (RestartArguments.TryGetWaitPid(args, out var previousPid))
         {
             WaitForExit(previousPid);
         }
 ```
-e o método:
+and the method:
 ```csharp
     private static void WaitForExit(int processId)
     {
@@ -3436,12 +3436,12 @@ e o método:
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
         {
-            // Processo anterior já terminou.
+            // Previous process has already ended.
         }
     }
 ```
 
-`src/Supermonitor/App.xaml.cs` — adicionar:
+`src/Supermonitor/App.xaml.cs` — add:
 ```csharp
     private bool _settingsWarningShown;
 
@@ -3539,7 +3539,7 @@ public static class AppearanceService
 
 - [ ] **Step 4: MainWindow**
 
-`src/Supermonitor/MainWindow.xaml` (substituir):
+`src/Supermonitor/MainWindow.xaml` (replace):
 ```xml
 <Window
     x:Class="Supermonitor.MainWindow"
@@ -3597,8 +3597,8 @@ public static class AppearanceService
 </Window>
 ```
 
-`src/Supermonitor/MainWindow.xaml.cs` — mudanças:
-- construtor: depois de `AppWindow.Changed += OnAppWindowChanged;`:
+`src/Supermonitor/MainWindow.xaml.cs` — changes:
+- constructor: after `AppWindow.Changed += OnAppWindowChanged;`:
 ```csharp
         AppearanceService.Apply(this, RootGrid, host.Settings.Current);
         AppearanceService.Changed += OnAppearanceChanged;
@@ -3608,8 +3608,8 @@ public static class AppearanceService
         SettingsInfoBar.IsOpen = App.Current.ConsumeSettingsWarning();
         PawnIoInfoBar.IsOpen = !HardwareProvider.IsPawnIoInstalled && !App.Current.PawnIoBannerDismissed;
 ```
-(remover a linha antiga `SettingsInfoBar.IsOpen = host.SettingsLoadResult == ...`).
-- métodos:
+(remove the old line `SettingsInfoBar.IsOpen = host.SettingsLoadResult == ...`).
+- methods:
 ```csharp
     private bool _pawnIoReady;
 
@@ -3659,12 +3659,12 @@ public static class AppearanceService
 ```
 (`using Supermonitor.Appearance; using Supermonitor.Core.Diagnostics; using Supermonitor.Core.Sensors.Hardware;`).
 
-- [ ] **Step 5: Build e verificação manual**
+- [ ] **Step 5: Build and manual verification**
 
-Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → todos passam.
-Run: `dotnet build ... -p:OutDir=<temp>\` → `0 Erro(s)`. Se `TitleBarTheme` tiver nomes de membros diferentes, ajustar para os membros reais do enum em `Microsoft.UI.Windowing` e registrar a decisão.
+Run: `dotnet test --project tests/Supermonitor.Tests --filter-not-trait "Category=Hardware"` → all pass.
+Run: `dotnet build ... -p:OutDir=<temp>\` → `0 Error(s)`. If `TitleBarTheme` has different member names, adjust to the real members of the enum in `Microsoft.UI.Windowing` and record the decision.
 
-Peça ao usuário sair pela bandeja e rode `pwsh tools/run-elevated.ps1` (UAC). Expected: janela abre com Mica; temperaturas de CPU e GPU aparecem nos cards (`cpu.temp`, `gpu0.temp`); banner PawnIO não aparece (PawnIO 2.2.0 já instalado nesta máquina).
+Ask the user to quit via the tray and run `pwsh tools/run-elevated.ps1` (UAC). Expected: window opens with Mica; CPU and GPU temperatures appear on the cards (`cpu.temp`, `gpu0.temp`); the PawnIO banner does not appear (PawnIO 2.2.0 is already installed on this machine).
 
 - [ ] **Step 6: Commit**
 
@@ -3675,17 +3675,17 @@ git commit -m "feat(app): apply theme, backdrop and accent; PawnIO install banne
 
 ---
 
-### Task 11: Customização do Overview
+### Task 11: Overview customization
 
 **Files:**
 - Create: `src/Supermonitor/Dialogs/AddCardDialog.cs`
-- Modify: `src/Supermonitor/ViewModels/OverviewViewModel.cs` (substituir), `src/Supermonitor/Views/OverviewPage.xaml(.cs)` (substituir)
+- Modify: `src/Supermonitor/ViewModels/OverviewViewModel.cs` (replace), `src/Supermonitor/Views/OverviewPage.xaml(.cs)` (replace)
 
 **Interfaces:**
 - Consumes: `DashboardEditor` (Task 7), `ICardActions`, `MetricCardViewModel` (Task 9), `AppSettings` v2 (Task 6).
-- Produces: `OverviewViewModel : ObservableObject, ICardActions, IDisposable` com `Cards`, `IsEditing`, `HistoryIndex` (0..2), `AddCard(string)`, `IReadOnlyList<MetricDescriptor> AvailableMetrics()`.
+- Produces: `OverviewViewModel : ObservableObject, ICardActions, IDisposable` with `Cards`, `IsEditing`, `HistoryIndex` (0..2), `AddCard(string)`, `IReadOnlyList<MetricDescriptor> AvailableMetrics()`.
 
-- [ ] **Step 1: Diálogo de adicionar card**
+- [ ] **Step 1: Add-card dialog**
 
 `src/Supermonitor/Dialogs/AddCardDialog.cs`:
 ```csharp
@@ -3732,7 +3732,7 @@ public sealed partial class AddCardDialog : ContentDialog
 
 - [ ] **Step 2: ViewModel**
 
-`src/Supermonitor/ViewModels/OverviewViewModel.cs` (substituir):
+`src/Supermonitor/ViewModels/OverviewViewModel.cs` (replace):
 ```csharp
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -3956,9 +3956,9 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
 }
 ```
 
-- [ ] **Step 3: Página**
+- [ ] **Step 3: Page**
 
-`src/Supermonitor/Views/OverviewPage.xaml` (substituir):
+`src/Supermonitor/Views/OverviewPage.xaml` (replace):
 ```xml
 <Page
     x:Class="Supermonitor.Views.OverviewPage"
@@ -4014,7 +4014,7 @@ public sealed partial class OverviewViewModel : ObservableObject, ICardActions, 
 </Page>
 ```
 
-`src/Supermonitor/Views/OverviewPage.xaml.cs` (substituir):
+`src/Supermonitor/Views/OverviewPage.xaml.cs` (replace):
 ```csharp
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -4082,16 +4082,16 @@ public sealed partial class OverviewPage : Page
 }
 ```
 
-- [ ] **Step 4: Build e verificação manual**
+- [ ] **Step 4: Build and manual verification**
 
-Run: testes de unidade → passam. Build com `-p:OutDir=<temp>\` → `0 Erro(s)`.
-Usuário sai pela bandeja; `pwsh tools/run-elevated.ps1`. Expected:
-1. "Customize" mostra "Add card", dica e botão de remover em cada card.
-2. Arrastar um card para outro troca a posição; reabrir o app mantém a ordem.
-3. Botão direito → Size Large/Compact muda o card; Chart Area/Bar muda o gráfico.
-4. Thresholds… em "CPU temperature" com Warning 30 e Critical 40 → valor fica amarelo/vermelho.
-5. "Add card" → buscar "hot spot" → adicionar "GPU hot spot".
-6. Histórico 5 min → gráficos mostram janela maior.
+Run: unit tests → pass. Build with `-p:OutDir=<temp>\` → `0 Error(s)`.
+User quits via the tray; `pwsh tools/run-elevated.ps1`. Expected:
+1. "Customize" shows "Add card", the hint and a remove button on each card.
+2. Dragging a card onto another swaps the position; reopening the app keeps the order.
+3. Right-click → Size Large/Compact changes the card; Chart Area/Bar changes the chart.
+4. Thresholds… on "CPU temperature" with Warning 30 and Critical 40 → value turns yellow/red.
+5. "Add card" → search "hot spot" → add "GPU hot spot".
+6. History 5 min → charts show a larger window.
 
 - [ ] **Step 5: Commit**
 
@@ -4102,18 +4102,18 @@ git commit -m "feat(app): customizable overview with drag reorder, sizes, charts
 
 ---
 
-### Task 12: Páginas de detalhe por categoria
+### Task 12: Detail pages per category
 
 **Files:**
 - Create: `src/Supermonitor/ViewModels/MetricGroupViewModel.cs`, `ProcessRowViewModel.cs`, `CategoryViewModel.cs`
 - Create: `src/Supermonitor/Controls/MemoryCompositionBar.xaml(.cs)`
 - Create: `src/Supermonitor/Views/CategoryPage.xaml(.cs)`
-- Modify: `src/Supermonitor/MainWindow.xaml(.cs)` (itens de navegação)
+- Modify: `src/Supermonitor/MainWindow.xaml(.cs)` (navigation items)
 
 **Interfaces:**
 - Consumes: `MetricStore.GetDescriptors()`, `ProcessMonitor.Snapshot`, `ProcessSorting.Top` (Task 8), `MemoryComposition` (Task 8), `Demand.Processes`.
 - Produces: `sealed record CategoryContext(PageContext Page, MetricCategory Category, string Title)`.
-- Produces: `CategoryViewModel(AppHost, MetricCategory, string title, DispatcherQueue, Func<bool>)` com `Title`, `Groups`, `TopProcesses`, `ShowsProcesses`, `IsMemory`, `event Action<MemoryComposition>? MemoryUpdated`, `Dispose()`.
+- Produces: `CategoryViewModel(AppHost, MetricCategory, string title, DispatcherQueue, Func<bool>)` with `Title`, `Groups`, `TopProcesses`, `ShowsProcesses`, `IsMemory`, `event Action<MemoryComposition>? MemoryUpdated`, `Dispose()`.
 - Produces: `ProcessRowViewModel` (`Name`, `Pid`, `CpuText`, `MemoryText`, `GpuText`, `Update(ProcessSample, UnitOptions)`).
 
 - [ ] **Step 1: ViewModels**
@@ -4337,7 +4337,7 @@ public sealed class CategoryViewModel : IDisposable
 }
 ```
 
-- [ ] **Step 2: Barra de composição de memória**
+- [ ] **Step 2: Memory composition bar**
 
 `src/Supermonitor/Controls/MemoryCompositionBar.xaml`:
 ```xml
@@ -4394,7 +4394,7 @@ public sealed partial class MemoryCompositionBar : UserControl
 }
 ```
 
-- [ ] **Step 3: Página**
+- [ ] **Step 3: Page**
 
 `src/Supermonitor/Views/CategoryPage.xaml`:
 ```xml
@@ -4505,9 +4505,9 @@ public sealed partial class CategoryPage : Page
 }
 ```
 
-- [ ] **Step 4: Navegação**
+- [ ] **Step 4: Navigation**
 
-Em `MainWindow.xaml`, depois do item Overview:
+In `MainWindow.xaml`, after the Overview item:
 ```xml
                 <NavigationViewItem Content="CPU" Tag="cpu">
                     <NavigationViewItem.Icon>
@@ -4536,7 +4536,7 @@ Em `MainWindow.xaml`, depois do item Overview:
                 </NavigationViewItem>
 ```
 
-Em `MainWindow.Navigate`, adicionar casos (`using Supermonitor.Core.Metrics;`):
+In `MainWindow.Navigate`, add cases (`using Supermonitor.Core.Metrics;`):
 ```csharp
             case "cpu":
                 ContentFrame.Navigate(typeof(CategoryPage), new CategoryContext(context, MetricCategory.Cpu, "CPU"));
@@ -4555,16 +4555,16 @@ Em `MainWindow.Navigate`, adicionar casos (`using Supermonitor.Core.Metrics;`):
                 break;
 ```
 
-- [ ] **Step 5: Build e verificação manual**
+- [ ] **Step 5: Build and manual verification**
 
-Run: testes de unidade → passam. Build com `-p:OutDir=<temp>\` → `0 Erro(s)`.
-Usuário sai pela bandeja; `pwsh tools/run-elevated.ps1`. Expected:
-1. CPU: grupo "CPU", grupo "CPU cores" (16 cards compactos), grupo "AMD Ryzen 7 7800X3D" com temperatura, clocks e potência; top processos por CPU.
-2. Memory: barra de composição com legenda; top processos por memória.
-3. GPU: grupo "AMD Radeon RX 9070 XT" com uso por engine, VRAM, temperaturas, clock, fan, potência; top processos por GPU.
-4. Disks: um grupo por disco e "Drives"; temperatura SMART aparece sob o nome do SSD.
-5. Network: um grupo por adaptador, "Network" e "Latency".
-6. Ícones da navegação batem com os glifos listados em Global Constraints.
+Run: unit tests → pass. Build with `-p:OutDir=<temp>\` → `0 Error(s)`.
+User quits via the tray; `pwsh tools/run-elevated.ps1`. Expected:
+1. CPU: group "CPU", group "CPU cores" (16 compact cards), group "AMD Ryzen 7 7800X3D" with temperature, clocks and power; top processes by CPU.
+2. Memory: composition bar with legend; top processes by memory.
+3. GPU: group "AMD Radeon RX 9070 XT" with per-engine usage, VRAM, temperatures, clock, fan, power; top processes by GPU.
+4. Disks: one group per disk and "Drives"; SMART temperature appears under the SSD name.
+5. Network: one group per adapter, "Network" and "Latency".
+6. Navigation icons match the glyphs listed in Global Constraints.
 
 - [ ] **Step 6: Commit**
 
@@ -4575,7 +4575,7 @@ git commit -m "feat(app): add CPU, Memory, GPU, Disks and Network detail pages"
 
 ---
 
-### Task 13: Página de processos
+### Task 13: Processes page
 
 **Files:**
 - Create: `src/Supermonitor/ViewModels/ProcessesViewModel.cs`, `src/Supermonitor/Views/ProcessesPage.xaml(.cs)`
@@ -4583,7 +4583,7 @@ git commit -m "feat(app): add CPU, Memory, GPU, Disks and Network detail pages"
 
 **Interfaces:**
 - Consumes: `ProcessSorting.Top`, `ProcessRowViewModel` (Task 12), `Demand.Processes`.
-- Produces: `ProcessesViewModel(AppHost, DispatcherQueue, Func<bool>)` com `Rows`, `SortKey`, `Filter`, `Dispose()`, propriedade observável `CountText`.
+- Produces: `ProcessesViewModel(AppHost, DispatcherQueue, Func<bool>)` with `Rows`, `SortKey`, `Filter`, `Dispose()`, observable property `CountText`.
 
 - [ ] **Step 1: ViewModel**
 
@@ -4691,7 +4691,7 @@ public sealed partial class ProcessesViewModel : ObservableObject, IDisposable
 }
 ```
 
-- [ ] **Step 2: Página**
+- [ ] **Step 2: Page**
 
 `src/Supermonitor/Views/ProcessesPage.xaml`:
 ```xml
@@ -4800,9 +4800,9 @@ public sealed partial class ProcessesPage : Page
 }
 ```
 
-- [ ] **Step 3: Navegação**
+- [ ] **Step 3: Navigation**
 
-Em `MainWindow.xaml`, depois de Network:
+In `MainWindow.xaml`, after Network:
 ```xml
                 <NavigationViewItem Content="Processes" Tag="processes">
                     <NavigationViewItem.Icon>
@@ -4810,17 +4810,17 @@ Em `MainWindow.xaml`, depois de Network:
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 ```
-Em `Navigate`:
+In `Navigate`:
 ```csharp
             case "processes":
                 ContentFrame.Navigate(typeof(ProcessesPage), context);
                 break;
 ```
 
-- [ ] **Step 4: Build e verificação manual**
+- [ ] **Step 4: Build and manual verification**
 
-Run: testes de unidade → passam. Build → `0 Erro(s)`.
-Usuário: abrir Processes. Expected: lista ordenada por CPU com nomes, PID, CPU%, memória privada e GPU%; clicar "Memory" reordena; filtro "chrome" filtra; contagem bate aproximadamente com o Gerenciador de Tarefas (aba Detalhes).
+Run: unit tests → pass. Build → `0 Error(s)`.
+User: open Processes. Expected: list sorted by CPU with names, PID, CPU%, private memory and GPU%; clicking "Memory" re-sorts; filter "chrome" filters; the count roughly matches Task Manager (Details tab).
 
 - [ ] **Step 5: Commit**
 
@@ -4831,18 +4831,18 @@ git commit -m "feat(app): add sortable, filterable processes page"
 
 ---
 
-### Task 14: Página de configurações v2
+### Task 14: Settings page v2
 
 **Files:**
-- Modify: `src/Supermonitor/Views/SettingsPage.xaml(.cs)` (substituir), `src/Supermonitor.Core/Shell/AutostartManager.cs`
+- Modify: `src/Supermonitor/Views/SettingsPage.xaml(.cs)` (replace), `src/Supermonitor.Core/Shell/AutostartManager.cs`
 
 **Interfaces:**
 - Consumes: `AppSettings` v2 (Task 6), `AppearanceService.NotifyChanged` (Task 10), `ColorText` (Task 6), `SensorHub.GetStatuses()`, `HardwareProvider.IsPawnIoInstalled`.
-- Produces: seções Appearance (tema, fundo, cor de destaque), Units, Monitoring (intervalo), Startup, Sensors (status do PawnIO e dos provedores).
+- Produces: sections Appearance (theme, backdrop, accent color), Units, Monitoring (interval), Startup, Sensors (PawnIO and provider status).
 
-- [ ] **Step 1: Timeout do schtasks**
+- [ ] **Step 1: schtasks timeout**
 
-Em `AutostartManager.RunSchtasks`, trocar `process.WaitForExit(10_000); return process.ExitCode;` por:
+In `AutostartManager.RunSchtasks`, replace `process.WaitForExit(10_000); return process.ExitCode;` with:
 ```csharp
         if (!process.WaitForExit(10_000))
         {
@@ -4853,9 +4853,9 @@ Em `AutostartManager.RunSchtasks`, trocar `process.WaitForExit(10_000); return p
         return process.ExitCode;
 ```
 
-- [ ] **Step 2: Página**
+- [ ] **Step 2: Page**
 
-`src/Supermonitor/Views/SettingsPage.xaml` (substituir):
+`src/Supermonitor/Views/SettingsPage.xaml` (replace):
 ```xml
 <Page
     x:Class="Supermonitor.Views.SettingsPage"
@@ -4909,7 +4909,7 @@ Em `AutostartManager.RunSchtasks`, trocar `process.WaitForExit(10_000); return p
 </Page>
 ```
 
-`src/Supermonitor/Views/SettingsPage.xaml.cs` (substituir):
+`src/Supermonitor/Views/SettingsPage.xaml.cs` (replace):
 ```csharp
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -5107,10 +5107,10 @@ public sealed partial class SettingsPage : Page
 }
 ```
 
-- [ ] **Step 3: Build e verificação manual**
+- [ ] **Step 3: Build and manual verification**
 
-Run: suíte completa → passa. Build → `0 Erro(s)`.
-Usuário: em Settings, trocar tema para Dark/Light (janela e barra de título mudam na hora), fundo Acrylic/Solid, desligar "Use the Windows accent color" e escolher uma cor (gráficos mudam de cor), ligar bits e °F (cards mostram Mbps e °F), conferir "Sensors" (PawnIO instalado; todos os provedores "available").
+Run: full suite → passes. Build → `0 Error(s)`.
+User: in Settings, switch theme to Dark/Light (window and title bar change immediately), backdrop Acrylic/Solid, turn off "Use the Windows accent color" and pick a color (charts change color), turn on bits and °F (cards show Mbps and °F), check "Sensors" (PawnIO installed; all providers "available").
 
 - [ ] **Step 4: Commit**
 
@@ -5121,32 +5121,32 @@ git commit -m "feat(app): settings page with appearance, units and sensor status
 
 ---
 
-### Task 15: Verificação de desempenho e fechamento
+### Task 15: Performance verification and wrap-up
 
 **Files:**
 - Create: `docs/superpowers/plans/2026-10-10-supermonitor-02-results.md`
 
 **Interfaces:**
-- Consumes: app completo.
-- Produces: registro dos critérios de desempenho com LHM e processos ativos.
+- Consumes: complete app.
+- Produces: record of the performance criteria with LHM and processes active.
 
-- [ ] **Step 1: Testes**
+- [ ] **Step 1: Tests**
 
 Run: `dotnet test --project tests/Supermonitor.Tests`
-Expected: todos passam (unidade + hardware).
+Expected: all pass (unit + hardware).
 
-- [ ] **Step 2: Medir no build Release**
+- [ ] **Step 2: Measure in the Release build**
 
-1. `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; usuário sai do app pela bandeja e abre o exe de `bin\x64\Release\…\win-x64\` como administrador.
-2. Overview aberto, intervalo 1 s, 60 s: `pwsh tools/measure-cpu.ps1`. Critério: < 1%.
-3. Página Processes aberta, 60 s: `pwsh tools/measure-cpu.ps1`. Registrar (sem critério na spec; referência para o Plano 3).
-4. Janela fechada (só bandeja), 60 s: `pwsh tools/measure-cpu.ps1`. Critério: < 0,3% (prova que as leases de LHM e processos foram liberadas).
+1. `dotnet build src/Supermonitor/Supermonitor.csproj -c Release -p:Platform=x64`; the user quits the app via the tray and opens the exe from `bin\x64\Release\…\win-x64\` as administrator.
+2. Overview open, 1 s interval, 60 s: `pwsh tools/measure-cpu.ps1`. Criterion: < 1%.
+3. Processes page open, 60 s: `pwsh tools/measure-cpu.ps1`. Record (no criterion in the spec; reference for Plan 3).
+4. Window closed (tray only), 60 s: `pwsh tools/measure-cpu.ps1`. Criterion: < 0.3% (proves the LHM and process leases were released).
 
-Se um critério falhar, aplicar superpowers:systematic-debugging. Suspeito principal: `HardwareProvider.Sample` (~9 ms/tick medidos no probe) ou lease não liberada.
+If a criterion fails, apply superpowers:systematic-debugging. Main suspect: `HardwareProvider.Sample` (~9 ms/tick measured in the probe) or a lease not released.
 
-- [ ] **Step 3: Registrar resultados**
+- [ ] **Step 3: Record results**
 
-`docs/superpowers/plans/2026-10-10-supermonitor-02-results.md`: data, build, CPU e memória nos três cenários, resultado dos testes, verificações manuais das Tasks 10–14 e desvios do plano com as decisões tomadas.
+`docs/superpowers/plans/2026-10-10-supermonitor-02-results.md`: date, build, CPU and memory in the three scenarios, test results, manual checks of Tasks 10–14 and deviations from the plan with the decisions taken.
 
 - [ ] **Step 4: Commit**
 
