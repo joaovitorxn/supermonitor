@@ -20,8 +20,8 @@ public sealed unsafe class NetworkProvider : ISensorProvider
 
     public void Initialize(MetricStore store)
     {
-        _totalDown = Register(store, MetricIds.NetworkTotalDown, "Download");
-        _totalUp = Register(store, MetricIds.NetworkTotalUp, "Upload");
+        _totalDown = Register(store, MetricIds.NetworkTotalDown, "Download", "Network");
+        _totalUp = Register(store, MetricIds.NetworkTotalUp, "Upload", "Network");
         var error = Scan(store);
         if (error != 0)
         {
@@ -113,16 +113,16 @@ public sealed unsafe class NetworkProvider : ISensorProvider
             _adapters.Add(new Adapter
             {
                 Luid = luid,
-                Down = Register(store, MetricIds.NetworkDown(index), $"{alias} download"),
-                Up = Register(store, MetricIds.NetworkUp(index), $"{alias} upload"),
+                Down = Register(store, MetricIds.NetworkDown(index), $"{alias} download", alias),
+                Up = Register(store, MetricIds.NetworkUp(index), $"{alias} upload", alias),
             });
         }
 
         return 0;
     }
 
-    private MetricHandle Register(MetricStore store, string id, string name) =>
-        store.Register(new MetricDescriptor(id, name, MetricCategory.Network, MetricUnit.BytesPerSecond), Name);
+    private MetricHandle Register(MetricStore store, string id, string name, string device) =>
+        store.Register(new MetricDescriptor(id, name, MetricCategory.Network, MetricUnit.BytesPerSecond, device), Name);
 
     private sealed class Adapter
     {

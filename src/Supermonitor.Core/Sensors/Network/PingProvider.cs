@@ -14,9 +14,9 @@ public sealed class PingProvider(PingMonitor monitor) : ISensorProvider
 
     public void Initialize(MetricStore store)
     {
-        _latency = store.Register(new MetricDescriptor(MetricIds.Ping, "Ping", MetricCategory.Network, MetricUnit.Milliseconds), Name);
-        _jitter = store.Register(new MetricDescriptor(MetricIds.PingJitter, "Jitter", MetricCategory.Network, MetricUnit.Milliseconds), Name);
-        _loss = store.Register(new MetricDescriptor(MetricIds.PingLoss, "Packet loss", MetricCategory.Network, MetricUnit.Percent), Name);
+        _latency = store.Register(new MetricDescriptor(MetricIds.Ping, "Ping", MetricCategory.Network, MetricUnit.Milliseconds, "Latency"), Name);
+        _jitter = store.Register(new MetricDescriptor(MetricIds.PingJitter, "Jitter", MetricCategory.Network, MetricUnit.Milliseconds, "Latency"), Name);
+        _loss = store.Register(new MetricDescriptor(MetricIds.PingLoss, "Packet loss", MetricCategory.Network, MetricUnit.Percent, "Latency"), Name);
     }
 
     public void Sample(MetricStore store, TimeSpan elapsed)

@@ -1,0 +1,58 @@
+<Page
+    x:Class="Supermonitor.Views.CategoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Supermonitor.Controls"
+    xmlns:vm="using:Supermonitor.ViewModels">
+    <ScrollViewer Padding="24">
+        <StackPanel Spacing="20">
+            <TextBlock Text="{x:Bind ViewModel.Title}" Style="{StaticResource TitleTextBlockStyle}" />
+            <controls:MemoryCompositionBar x:Name="MemoryBar" Visibility="Collapsed" />
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
+                <ItemsRepeater.Layout>
+                    <StackLayout Spacing="20" />
+                </ItemsRepeater.Layout>
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MetricGroupViewModel">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{x:Bind Name}" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <ItemsRepeater ItemsSource="{x:Bind Items}">
+                                <ItemsRepeater.Layout>
+                                    <controls:CardWrapLayout Spacing="12" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MetricCardViewModel">
+                                        <controls:MetricCard ViewModel="{x:Bind}" />
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+            </ItemsRepeater>
+            <StackPanel x:Name="ProcessesPanel" Spacing="8" Visibility="Collapsed">
+                <TextBlock Text="Top processes" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.TopProcesses, Mode=OneWay}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                            <Grid ColumnSpacing="12" Padding="8,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="100" />
+                                    <ColumnDefinition Width="60" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{x:Bind Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind Pid, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind CpuText, Mode=OneWay}" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="3" Text="{x:Bind MemoryText, Mode=OneWay}" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Column="4" Text="{x:Bind GpuText, Mode=OneWay}" HorizontalAlignment="Right" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

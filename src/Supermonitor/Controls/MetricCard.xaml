@@ -2,29 +2,75 @@
     x:Class="Supermonitor.Controls.MetricCard"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Supermonitor.Controls">
+    xmlns:local="using:Supermonitor.Controls"
+    Width="{x:Bind local:CardMetrics.Width(ViewModel.Size), Mode=OneWay}"
+    Height="{x:Bind local:CardMetrics.Height(ViewModel.Size), Mode=OneWay}">
     <Border
+        x:Name="CardBorder"
         Padding="16"
         CornerRadius="8"
         BorderThickness="1"
         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+        <Border.ContextFlyout>
+            <MenuFlyout x:Name="CardMenu" Opening="OnMenuOpening">
+                <MenuFlyoutSubItem Text="Size">
+                    <RadioMenuFlyoutItem x:Name="SizeCompact" Text="Compact" GroupName="size" Click="OnSizeClick" Tag="Compact" />
+                    <RadioMenuFlyoutItem x:Name="SizeNormal" Text="Normal" GroupName="size" Click="OnSizeClick" Tag="Normal" />
+                    <RadioMenuFlyoutItem x:Name="SizeLarge" Text="Large" GroupName="size" Click="OnSizeClick" Tag="Large" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem Text="Chart">
+                    <RadioMenuFlyoutItem x:Name="ChartLine" Text="Line" GroupName="chart" Click="OnChartClick" Tag="Line" />
+                    <RadioMenuFlyoutItem x:Name="ChartArea" Text="Area" GroupName="chart" Click="OnChartClick" Tag="Area" />
+                    <RadioMenuFlyoutItem x:Name="ChartBar" Text="Bar" GroupName="chart" Click="OnChartClick" Tag="Bar" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutItem Text="Thresholds…" Click="OnThresholdsClick" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Move earlier" Click="OnMoveEarlierClick" />
+                <MenuFlyoutItem Text="Move later" Click="OnMoveLaterClick" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Remove" Click="OnRemoveClick">
+                    <MenuFlyoutItem.Icon>
+                        <FontIcon Glyph="&#xE74D;" />
+                    </MenuFlyoutItem.Icon>
+                </MenuFlyoutItem>
+            </MenuFlyout>
+        </Border.ContextFlyout>
         <Grid RowSpacing="4">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <TextBlock
                 Text="{x:Bind ViewModel.Title, Mode=OneWay}"
                 Style="{StaticResource BodyStrongTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 TextTrimming="CharacterEllipsis" />
+            <Button
+                x:Name="RemoveButton"
+                Grid.Column="1"
+                Padding="4"
+                Visibility="Collapsed"
+                Click="OnRemoveClick"
+                ToolTipService.ToolTip="Remove card">
+                <FontIcon Glyph="&#xE74D;" FontSize="12" />
+            </Button>
             <TextBlock
+                x:Name="ValueText"
                 Grid.Row="1"
+                Grid.ColumnSpan="2"
                 Text="{x:Bind ViewModel.ValueText, Mode=OneWay}"
                 Style="{StaticResource SubtitleTextBlockStyle}" />
-            <local:SparklineChart x:Name="Chart" Grid.Row="2" MinHeight="60" />
+            <local:TimeSeriesChart
+                x:Name="Chart"
+                Grid.Row="2"
+                Grid.ColumnSpan="2"
+                Visibility="{x:Bind local:CardMetrics.ChartVisibility(ViewModel.Size), Mode=OneWay}" />
         </Grid>
     </Border>
 </UserControl>

@@ -42,5 +42,5 @@ public sealed class DriveSpaceProvider : ISensorProvider
     }
 
     private MetricHandle Register(MetricStore store, string id, string name, MetricUnit unit) =>
-        store.Register(new MetricDescriptor(id, name, MetricCategory.Disk, unit), Name);
+        store.Register(new MetricDescriptor(id, name, MetricCategory.Disk, unit, "Drives"), Name);
 }

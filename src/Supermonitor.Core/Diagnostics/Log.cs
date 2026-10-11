@@ -9,16 +9,17 @@ public static class Log
     {
         Directory.CreateDirectory(directory);
         _directory = directory;
-        try
+        var names = Directory.EnumerateFiles(directory).Select(Path.GetFileName).OfType<string>();
+        foreach (var name in LogRetention.FilesToDelete(names, DateOnly.FromDateTime(DateTime.Now), LogRetention.KeepDays).ToArray())
         {
-            var names = Directory.EnumerateFiles(directory).Select(Path.GetFileName).OfType<string>();
-            foreach (var name in LogRetention.FilesToDelete(names, DateOnly.FromDateTime(DateTime.Now), LogRetention.KeepDays).ToArray())
+            try
             {
                 File.Delete(Path.Combine(directory, name));
             }
-        }
-        catch (IOException)
-        {
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Arquivo antigo bloqueado ou somente leitura: fica para a próxima limpeza.
+            }
         }
     }
 

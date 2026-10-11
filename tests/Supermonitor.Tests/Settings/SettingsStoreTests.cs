@@ -110,6 +110,22 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Enums_are_saved_as_strings_and_v1_files_load_their_cards()
+    {
+        File.WriteAllText(FilePath, """{ "version": 1, "overviewCards": ["cpu.usage"] }""");
+        using (var store = CreateStore())
+        {
+            Assert.Equal(SettingsLoadResult.Loaded, store.Load());
+            Assert.Equal(new[] { "cpu.usage" }, store.Current.Cards.Select(c => c.MetricId));
+            store.Current.Theme = AppTheme.Dark;
+            store.RequestSave();
+            store.Flush();
+        }
+
+        Assert.Contains("\"theme\": \"Dark\"", File.ReadAllText(FilePath));
+    }
+
+    [Fact]
     public void Out_of_range_values_are_normalized_on_load()
     {
         File.WriteAllText(FilePath, "{ \"version\": 1, \"sampleIntervalMs\": 7, \"pingHost\": \"\" }");

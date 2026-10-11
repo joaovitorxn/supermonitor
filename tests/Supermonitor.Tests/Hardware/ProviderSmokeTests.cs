@@ -1,10 +1,13 @@
+using Supermonitor.Core;
 using Supermonitor.Core.Metrics;
 using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
 using Supermonitor.Core.Sensors.Disk;
 using Supermonitor.Core.Sensors.Gpu;
+using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Sensors.Memory;
 using Supermonitor.Core.Sensors.Network;
+using Supermonitor.Core.Sensors.Processes;
 
 namespace Supermonitor.Tests.Hardware;
 
@@ -34,6 +37,8 @@ public class ProviderSmokeTests
         {
             Assert.InRange(store.GetLatest(MetricIds.CpuCoreUsage(core)), 0, 100);
         }
+        Assert.True(store.TryGetDescriptor(MetricIds.CpuUsage, out var descriptor));
+        Assert.Equal("CPU", descriptor!.Device);
     }
 
     [Fact]
@@ -89,5 +94,29 @@ public class ProviderSmokeTests
         Assert.InRange(store.GetLatest(MetricIds.GpuUsage(0)), 0, 100);
         Assert.True(store.GetLatest(MetricIds.GpuVramTotal(0)) > 0);
         Assert.True(store.GetLatest(MetricIds.GpuVramUsed(0)) > 0);
+        Assert.True(store.TryGetDescriptor(MetricIds.GpuUsage(0), out var descriptor));
+        Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
+    }
+
+    [Fact]
+    public void Hardware_provider_reports_gpu_temperature()
+    {
+        using var provider = new HardwareProvider(AppHost.MonitoredGpuNames);
+        var store = SampleTwice(provider);
+
+        Assert.InRange(store.GetLatest(MetricIds.GpuTemperature(0)), 1, 120);
+        Assert.True(store.TryGetDescriptor(MetricIds.GpuTemperature(0), out var descriptor));
+        Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
+    }
+
+    [Fact]
+    public void Process_monitor_lists_this_process_with_cpu_usage()
+    {
+        using var provider = new ProcessMonitor(new ProcessGpuUsage());
+        SampleTwice(provider);
+
+        var self = Assert.Single(provider.Snapshot, p => p.ProcessId == Environment.ProcessId);
+        Assert.True(float.IsFinite(self.CpuPercent));
+        Assert.True(self.PrivateBytes > 0);
     }
 }

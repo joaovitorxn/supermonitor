@@ -3,7 +3,7 @@ using Supermonitor.Core.Sensors.Pdh;
 
 namespace Supermonitor.Core.Sensors.Gpu;
 
-public sealed class GpuProvider : ISensorProvider
+public sealed class GpuProvider(ProcessGpuUsage? processUsage = null) : ISensorProvider
 {
     private Adapter[] _adapters = [];
     private GpuEngineAggregator? _aggregator;
@@ -47,6 +47,8 @@ public sealed class GpuProvider : ISensorProvider
             _aggregator.Add(engines.NameAt(i), engines.ValueAt(i));
         }
 
+        processUsage?.Publish(_aggregator);
+
         for (var n = 0; n < _adapters.Length; n++)
         {
             var adapter = _adapters[n];
@@ -85,7 +87,7 @@ public sealed class GpuProvider : ISensorProvider
     {
         var prefix = total > 1 ? $"GPU {n}" : "GPU";
         MetricHandle Add(string id, string name, MetricUnit unit) =>
-            store.Register(new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit), Name);
+            store.Register(new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit, info.Name), Name);
 
         return new Adapter(info, $"luid_{info.PdhLuid}")
         {

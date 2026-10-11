@@ -2,6 +2,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Supermonitor.Core;
 using Supermonitor.Core.Diagnostics;
+using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
 
 namespace Supermonitor;
@@ -15,6 +16,7 @@ public partial class App : Application
     private TrayIcon? _tray;
     private MainWindow? _window;
     private bool _exiting;
+    private bool _settingsWarningShown;
 
     public App(string[] args, SingleInstance instance)
     {
@@ -23,6 +25,39 @@ public partial class App : Application
         InitializeComponent();
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
         UnhandledException += (_, e) => Log.Error("Unhandled UI exception", e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Error("Unobserved task exception", e.Exception);
+            e.SetObserved();
+        };
+    }
+
+    public static new App Current => (App)Application.Current;
+
+    public bool PawnIoBannerDismissed { get; set; }
+
+    public bool ConsumeSettingsWarning()
+    {
+        if (_settingsWarningShown || _host?.SettingsLoadResult != SettingsLoadResult.RecoveredFromCorrupt)
+        {
+            return false;
+        }
+
+        _settingsWarningShown = true;
+        return true;
+    }
+
+    public void Restart()
+    {
+        var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+        foreach (var argument in RestartArguments.Build(Environment.ProcessId))
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        System.Diagnostics.Process.Start(start);
+        ExitApp();
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -30,6 +65,7 @@ public partial class App : Application
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _host = AppHost.Create();
         _host.Start();
+        Appearance.AppearanceService.ApplyAccentResources(_host.Settings.Current.AccentColor);
 
         _tray = new TrayIcon(
             "Supermonitor",

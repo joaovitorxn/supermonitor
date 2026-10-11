@@ -11,6 +11,8 @@ public interface ISensorProvider : IDisposable
     void Initialize(MetricStore store);
 
     void Sample(MetricStore store, TimeSpan elapsed);
+
+    Demand? RequiredDemand => null;
 }
 
 public sealed record ProviderStatus(string Name, bool IsAvailable, string? UnavailableReason);

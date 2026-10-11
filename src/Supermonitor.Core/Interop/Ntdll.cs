@@ -4,6 +4,7 @@ namespace Supermonitor.Core.Interop;
 
 internal static unsafe partial class Ntdll
 {
+    public const int SystemProcessInformation = 5;
     public const int SystemMemoryListInformation = 80;
 
     [StructLayout(LayoutKind.Sequential)]

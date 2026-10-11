@@ -19,6 +19,10 @@ internal sealed class FakeProvider(string name) : ISensorProvider
 
     public bool SkipWrite { get; set; }
 
+    public ManualResetEventSlim? InitializeGate { get; init; }
+
+    public Demand? RequiredDemand { get; init; }
+
     public List<TimeSpan> Elapsed { get; } = [];
 
     public bool Disposed { get; private set; }
@@ -27,6 +31,7 @@ internal sealed class FakeProvider(string name) : ISensorProvider
 
     public void Initialize(MetricStore store)
     {
+        InitializeGate?.Wait();
         if (FailInitialize)
         {
             throw new InvalidOperationException("no hardware");
