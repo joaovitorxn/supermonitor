@@ -12,7 +12,7 @@ public class SettingsMigratorTests
 
         var migrated = SettingsMigrator.Migrate(root);
 
-        Assert.Equal(2, migrated["version"]!.GetValue<int>());
+        Assert.Equal(SettingsMigrator.CurrentVersion, migrated["version"]!.GetValue<int>());
         Assert.Null(migrated["overviewCards"]);
         var cards = migrated["cards"]!.AsArray();
         Assert.Equal(new[] { "cpu.usage", "net.ping" }, cards.Select(c => c!["metricId"]!.GetValue<string>()));
@@ -37,5 +37,41 @@ public class SettingsMigratorTests
         var migrated = SettingsMigrator.Migrate(root);
 
         Assert.Single(migrated["cards"]!.AsArray());
+    }
+
+    [Fact]
+    public void Version_two_document_is_bumped_to_three_and_keeps_its_fields()
+    {
+        var root = JsonNode.Parse("""{ "version": 2, "pingHost": "9.9.9.9", "cards": [ { "metricId": "cpu.usage" } ] }""")!.AsObject();
+
+        var migrated = SettingsMigrator.Migrate(root);
+
+        Assert.Equal(3, migrated["version"]!.GetValue<int>());
+        Assert.Equal("9.9.9.9", migrated["pingHost"]!.GetValue<string>());
+        Assert.Single(migrated["cards"]!.AsArray());
+        Assert.Null(migrated["overlay"]);
+    }
+
+    [Fact]
+    public void Version_two_file_loads_with_default_overlay_settings()
+    {
+        var dir = Directory.CreateTempSubdirectory("smtest");
+        try
+        {
+            var path = Path.Combine(dir.FullName, "settings.json");
+            File.WriteAllText(path, """{ "version": 2, "pingHost": "9.9.9.9" }""");
+            using var store = new SettingsStore(path, TimeProvider.System, TimeSpan.FromMilliseconds(500));
+
+            var result = store.Load();
+
+            Assert.Equal(SettingsLoadResult.Loaded, result);
+            Assert.Equal("9.9.9.9", store.Current.PingHost);
+            Assert.False(store.Current.Overlay.Enabled);
+            Assert.Equal(3, store.Current.Version);
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
     }
 }

@@ -5,7 +5,7 @@ namespace Supermonitor.Core.Settings;
 
 public static class SettingsMigrator
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public static JsonObject Migrate(JsonObject root)
     {
@@ -36,6 +36,12 @@ public static class SettingsMigrator
 
             root.Remove("overviewCards");
             version = 2;
+        }
+
+        // v2 → v3: o bloco "overlay" é novo; ausente, o AppSettings usa os padrões. Nenhum campo mudou.
+        if (version < 3)
+        {
+            version = 3;
         }
 
         root["version"] = version;
