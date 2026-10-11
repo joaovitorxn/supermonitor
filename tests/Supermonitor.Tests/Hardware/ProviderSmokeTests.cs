@@ -3,6 +3,7 @@ using Supermonitor.Core.Sensors;
 using Supermonitor.Core.Sensors.Cpu;
 using Supermonitor.Core.Sensors.Disk;
 using Supermonitor.Core.Sensors.Memory;
+using Supermonitor.Core.Sensors.Network;
 
 namespace Supermonitor.Tests.Hardware;
 
@@ -66,5 +67,15 @@ public class ProviderSmokeTests
 
         Assert.True(store.GetLatest(MetricIds.DriveTotal(letter)) > 0);
         Assert.InRange(store.GetLatest(MetricIds.DriveUsage(letter)), 0, 100);
+    }
+
+    [Fact]
+    public void Network_provider_reports_totals()
+    {
+        using var provider = new NetworkProvider();
+        var store = SampleTwice(provider);
+
+        Assert.True(store.GetLatest(MetricIds.NetworkTotalDown) >= 0);
+        Assert.True(store.GetLatest(MetricIds.NetworkTotalUp) >= 0);
     }
 }
