@@ -26,6 +26,6 @@ public enum MetricCategory
     System,
 }
 
-public sealed record MetricDescriptor(string Id, string DisplayName, MetricCategory Category, MetricUnit Unit);
+public sealed record MetricDescriptor(string Id, string DisplayName, MetricCategory Category, MetricUnit Unit, string? Device = null);
 
 public readonly record struct MetricHandle(int Index);

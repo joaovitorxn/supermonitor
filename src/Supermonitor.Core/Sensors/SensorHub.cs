@@ -14,8 +14,12 @@ public sealed class SensorHub : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private PeriodicTimer? _timer;
     private Task? _loop;
+    private readonly Lock _handlersGate = new();
+    private Action[] _handlers = [];
     private TimeSpan _interval;
     private bool _initialized;
+    private bool _handlerErrorLogged;
+    private long _lastHandlerError;
 
     public SensorHub(MetricStore store, IEnumerable<ISensorProvider> providers, TimeProvider time, TimeSpan interval)
     {
@@ -25,7 +29,28 @@ public sealed class SensorHub : IAsyncDisposable
         Interval = interval;
     }
 
-    public event Action? SampleReady;
+    public event Action SampleReady
+    {
+        add
+        {
+            lock (_handlersGate)
+            {
+                _handlers = [.. _handlers, value];
+            }
+        }
+
+        remove
+        {
+            lock (_handlersGate)
+            {
+                var index = Array.IndexOf(_handlers, value);
+                if (index >= 0)
+                {
+                    _handlers = [.. _handlers.AsSpan(0, index), .. _handlers.AsSpan(index + 1)];
+                }
+            }
+        }
+    }
 
     public TimeSpan Interval
     {
@@ -69,7 +94,6 @@ public sealed class SensorHub : IAsyncDisposable
 
     public void Start()
     {
-        InitializeProviders();
         _timer = new PeriodicTimer(_interval, _time);
         _loop = Task.Run(() => RunAsync(_cts.Token));
     }
@@ -115,13 +139,16 @@ public sealed class SensorHub : IAsyncDisposable
 
         _store.CommitTick();
 
-        try
+        foreach (var handler in Volatile.Read(ref _handlers))
         {
-            SampleReady?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("SampleReady handler failed", ex);
+            try
+            {
+                handler();
+            }
+            catch (Exception ex)
+            {
+                LogHandlerFailure(ex);
+            }
         }
     }
 
@@ -149,8 +176,22 @@ public sealed class SensorHub : IAsyncDisposable
         _cts.Dispose();
     }
 
+    private void LogHandlerFailure(Exception exception)
+    {
+        var now = _time.GetTimestamp();
+        if (_handlerErrorLogged && _time.GetElapsedTime(_lastHandlerError, now) < TimeSpan.FromMinutes(1))
+        {
+            return;
+        }
+
+        _handlerErrorLogged = true;
+        _lastHandlerError = now;
+        Log.Error("SampleReady handler failed", exception);
+    }
+
     private async Task RunAsync(CancellationToken cancellationToken)
     {
+        InitializeProviders();
         Tick();
         try
         {

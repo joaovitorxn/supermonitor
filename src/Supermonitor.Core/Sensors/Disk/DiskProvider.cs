@@ -45,10 +45,10 @@ public sealed class DiskProvider : ISensorProvider
 
             var title = label.IsEmpty ? $"Disk {index}" : $"Disk {index} ({label.ToString()})";
             _disks[name.ToString()] = new DiskHandles(
-                Register(store, MetricIds.DiskRead(index), $"{title} read", MetricUnit.BytesPerSecond),
-                Register(store, MetricIds.DiskWrite(index), $"{title} write", MetricUnit.BytesPerSecond),
-                Register(store, MetricIds.DiskActive(index), $"{title} active time", MetricUnit.Percent),
-                Register(store, MetricIds.DiskQueue(index), $"{title} queue", MetricUnit.Count));
+                Register(store, MetricIds.DiskRead(index), $"{title} read", MetricUnit.BytesPerSecond, title),
+                Register(store, MetricIds.DiskWrite(index), $"{title} write", MetricUnit.BytesPerSecond, title),
+                Register(store, MetricIds.DiskActive(index), $"{title} active time", MetricUnit.Percent, title),
+                Register(store, MetricIds.DiskQueue(index), $"{title} queue", MetricUnit.Count, title));
         }
     }
 
@@ -92,8 +92,8 @@ public sealed class DiskProvider : ISensorProvider
         }
     }
 
-    private MetricHandle Register(MetricStore store, string id, string name, MetricUnit unit) =>
-        store.Register(new MetricDescriptor(id, name, MetricCategory.Disk, unit), Name);
+    private MetricHandle Register(MetricStore store, string id, string name, MetricUnit unit, string device) =>
+        store.Register(new MetricDescriptor(id, name, MetricCategory.Disk, unit, device), Name);
 
     private sealed record DiskHandles(MetricHandle Read, MetricHandle Write, MetricHandle Active, MetricHandle Queue);
 }

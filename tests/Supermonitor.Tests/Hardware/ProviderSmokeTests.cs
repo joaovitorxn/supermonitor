@@ -34,6 +34,8 @@ public class ProviderSmokeTests
         {
             Assert.InRange(store.GetLatest(MetricIds.CpuCoreUsage(core)), 0, 100);
         }
+        Assert.True(store.TryGetDescriptor(MetricIds.CpuUsage, out var descriptor));
+        Assert.Equal("CPU", descriptor!.Device);
     }
 
     [Fact]
@@ -89,5 +91,7 @@ public class ProviderSmokeTests
         Assert.InRange(store.GetLatest(MetricIds.GpuUsage(0)), 0, 100);
         Assert.True(store.GetLatest(MetricIds.GpuVramTotal(0)) > 0);
         Assert.True(store.GetLatest(MetricIds.GpuVramUsed(0)) > 0);
+        Assert.True(store.TryGetDescriptor(MetricIds.GpuUsage(0), out var descriptor));
+        Assert.False(string.IsNullOrWhiteSpace(descriptor!.Device));
     }
 }

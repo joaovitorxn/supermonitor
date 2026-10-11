@@ -23,6 +23,12 @@ public partial class App : Application
         InitializeComponent();
         DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
         UnhandledException += (_, e) => Log.Error("Unhandled UI exception", e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Error("Unobserved task exception", e.Exception);
+            e.SetObserved();
+        };
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

@@ -92,5 +92,5 @@ public sealed unsafe class MemoryProvider : ISensorProvider
     }
 
     private MetricHandle Register(MetricStore store, string id, string name, MetricUnit unit) =>
-        store.Register(new MetricDescriptor(id, name, MetricCategory.Memory, unit), Name);
+        store.Register(new MetricDescriptor(id, name, MetricCategory.Memory, unit, "Memory"), Name);
 }

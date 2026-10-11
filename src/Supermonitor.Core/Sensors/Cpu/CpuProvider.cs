@@ -23,7 +23,7 @@ public sealed class CpuProvider : ISensorProvider
         _query.Collect();
         _query.Collect();
 
-        _totalHandle = store.Register(new MetricDescriptor(MetricIds.CpuUsage, "CPU usage", MetricCategory.Cpu, MetricUnit.Percent), Name);
+        _totalHandle = store.Register(new MetricDescriptor(MetricIds.CpuUsage, "CPU usage", MetricCategory.Cpu, MetricUnit.Percent, "CPU"), Name);
 
         var keys = new List<int>();
         var array = _perCore.GetArray();
@@ -39,7 +39,7 @@ public sealed class CpuProvider : ISensorProvider
         for (var index = 0; index < keys.Count; index++)
         {
             _cores[keys[index]] = store.Register(
-                new MetricDescriptor(MetricIds.CpuCoreUsage(index), $"Core {index} usage", MetricCategory.Cpu, MetricUnit.Percent),
+                new MetricDescriptor(MetricIds.CpuCoreUsage(index), $"Core {index} usage", MetricCategory.Cpu, MetricUnit.Percent, "CPU cores"),
                 Name);
         }
     }
@@ -47,17 +47,20 @@ public sealed class CpuProvider : ISensorProvider
     public void Sample(MetricStore store, TimeSpan elapsed)
     {
         _query!.Collect();
-        store.Write(_totalHandle, (float)_total!.GetValue());
+        store.Write(_totalHandle, Clamp(_total!.GetValue()));
 
         var array = _perCore!.GetArray();
         for (var i = 0; i < array.Count; i++)
         {
             if (CpuInstanceName.TryParse(array.NameAt(i), out var key) && _cores.TryGetValue(key, out var handle))
             {
-                store.Write(handle, (float)array.ValueAt(i));
+                store.Write(handle, Clamp(array.ValueAt(i)));
             }
         }
     }
 
     public void Dispose() => _query?.Dispose();
+
+    // "% Processor Utility" passa de 100 com turbo boost; o Gerenciador de Tarefas limita a 100.
+    private static float Clamp(double value) => double.IsFinite(value) ? (float)Math.Clamp(value, 0, 100) : float.NaN;
 }

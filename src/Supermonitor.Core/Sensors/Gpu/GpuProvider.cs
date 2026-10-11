@@ -85,7 +85,7 @@ public sealed class GpuProvider : ISensorProvider
     {
         var prefix = total > 1 ? $"GPU {n}" : "GPU";
         MetricHandle Add(string id, string name, MetricUnit unit) =>
-            store.Register(new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit), Name);
+            store.Register(new MetricDescriptor(id, $"{prefix} {name}", MetricCategory.Gpu, unit, info.Name), Name);
 
         return new Adapter(info, $"luid_{info.PdhLuid}")
         {
