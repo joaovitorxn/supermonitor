@@ -43,4 +43,35 @@ public class DemandTrackerTests
 
         Assert.True(tracker.IsActive(Demand.Processes));
     }
+
+    [Fact]
+    public void Changed_fires_when_the_first_lease_is_taken_and_the_last_is_released()
+    {
+        var tracker = new DemandTracker();
+        var events = new List<(Demand, bool)>();
+        tracker.Changed += (demand, active) => events.Add((demand, active));
+
+        var first = tracker.Acquire(Demand.FrameCapture);
+        var second = tracker.Acquire(Demand.FrameCapture);
+        first.Dispose();
+        Assert.Equal(new[] { (Demand.FrameCapture, true) }, events);
+
+        second.Dispose();
+        second.Dispose();
+
+        Assert.Equal(new[] { (Demand.FrameCapture, true), (Demand.FrameCapture, false) }, events);
+    }
+
+    [Fact]
+    public void Changed_reports_each_demand_separately()
+    {
+        var tracker = new DemandTracker();
+        var events = new List<(Demand, bool)>();
+        tracker.Changed += (demand, active) => events.Add((demand, active));
+
+        using var processes = tracker.Acquire(Demand.Processes);
+        using var hardware = tracker.Acquire(Demand.HardwareSensors);
+
+        Assert.Equal(new[] { (Demand.Processes, true), (Demand.HardwareSensors, true) }, events);
+    }
 }
