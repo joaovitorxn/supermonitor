@@ -1,8 +1,11 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Supermonitor.Appearance;
 using Supermonitor.Core;
+using Supermonitor.Core.Diagnostics;
 using Supermonitor.Core.Sensors;
+using Supermonitor.Core.Sensors.Hardware;
 using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
 using Supermonitor.ViewModels;
@@ -16,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly AppHost _host;
     private bool _lastMinimized;
     private IDisposable? _sensorLease;
+    private bool _pawnIoReady;
 
     public MainWindow(AppHost host)
     {
@@ -27,8 +31,13 @@ public sealed partial class MainWindow : Window
         AppWindow.SetIcon(AppPaths.IconPath);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 800));
         AppWindow.Changed += OnAppWindowChanged;
+        AppearanceService.Apply(this, RootGrid, host.Settings.Current);
+        AppearanceService.Changed += OnAppearanceChanged;
+        RootGrid.ActualThemeChanged += (_, _) => AppearanceService.Apply(this, RootGrid, _host.Settings.Current);
+        Closed += (_, _) => AppearanceService.Changed -= OnAppearanceChanged;
 
-        SettingsInfoBar.IsOpen = host.SettingsLoadResult == SettingsLoadResult.RecoveredFromCorrupt;
+        SettingsInfoBar.IsOpen = App.Current.ConsumeSettingsWarning();
+        PawnIoInfoBar.IsOpen = !HardwareProvider.IsPawnIoInstalled && !App.Current.PawnIoBannerDismissed;
         Nav.SelectedItem = Nav.MenuItems[0];
 
         Closed += (_, _) => ReleaseSensorLease();
@@ -56,6 +65,50 @@ public sealed partial class MainWindow : Window
             _lastMinimized = minimized;
             ProcessEfficiency.SetEfficiencyMode(minimized);
             UpdateSensorLease();
+        }
+    }
+
+    private void OnAppearanceChanged() => AppearanceService.Apply(this, RootGrid, _host.Settings.Current);
+
+    private void OnPawnIoInfoBarClosed(InfoBar sender, InfoBarClosedEventArgs args) => App.Current.PawnIoBannerDismissed = true;
+
+    private async void OnPawnIoButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_pawnIoReady)
+        {
+            App.Current.Restart();
+            return;
+        }
+
+        PawnIoButton.IsEnabled = false;
+        PawnIoInfoBar.Message = "Installing PawnIO…";
+        try
+        {
+            var exitCode = await PawnIoInstaller.InstallAsync();
+            if (exitCode == 0 || HardwareProvider.IsPawnIoInstalled)
+            {
+                _pawnIoReady = true;
+                PawnIoInfoBar.Severity = InfoBarSeverity.Success;
+                PawnIoInfoBar.Title = "PawnIO installed";
+                PawnIoInfoBar.Message = "Restart Supermonitor to load the driver.";
+                PawnIoButton.Content = "Restart now";
+            }
+            else
+            {
+                PawnIoInfoBar.Severity = InfoBarSeverity.Error;
+                PawnIoInfoBar.Message = $"Installation failed (winget exit code {exitCode}). You can install PawnIO manually from pawnio.eu.";
+                PawnIoButton.Content = "Try again";
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Log.Warn("winget could not be started", ex);
+            PawnIoInfoBar.Severity = InfoBarSeverity.Error;
+            PawnIoInfoBar.Message = "winget is not available. Install PawnIO manually from pawnio.eu.";
+        }
+        finally
+        {
+            PawnIoButton.IsEnabled = true;
         }
     }
 
