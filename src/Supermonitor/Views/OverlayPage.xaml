@@ -1,0 +1,174 @@
+<Page
+    x:Class="Supermonitor.Views.OverlayPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <Grid Padding="24,0,24,24" ColumnSpacing="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="440" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="16">
+                <TextBlock Text="Overlay" Style="{StaticResource TitleTextBlockStyle}" />
+                <ToggleSwitch x:Name="EnabledSwitch" Header="Show overlay" Toggled="OnEnabledToggled" />
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Opacity="0.7"
+                    TextWrapping="Wrap"
+                    Text="Shows over windowed and borderless games. FPS is measured on the window in the foreground; exclusive fullscreen is not supported." />
+                <InfoBar x:Name="CaptureBar" Severity="Warning" IsOpen="False" IsClosable="False" Title="FPS capture unavailable" />
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Preset" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="PresetBox" HorizontalAlignment="Stretch" SelectionChanged="OnPresetChanged" />
+                        <Button x:Name="SavePresetButton" Grid.Column="1" Content="Save as…" Click="OnSavePresetClick" />
+                        <Button x:Name="DeletePresetButton" Grid.Column="2" Content="Delete" Click="OnDeletePresetClick" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Position" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <ComboBox x:Name="MonitorBox" Header="Monitor" HorizontalAlignment="Stretch" SelectionChanged="OnMonitorChanged" />
+                    <ComboBox x:Name="AnchorBox" Header="Anchor" HorizontalAlignment="Stretch" SelectionChanged="OnAnchorChanged">
+                        <ComboBoxItem Content="Top left" />
+                        <ComboBoxItem Content="Top center" />
+                        <ComboBoxItem Content="Top right" />
+                        <ComboBoxItem Content="Middle left" />
+                        <ComboBoxItem Content="Center" />
+                        <ComboBoxItem Content="Middle right" />
+                        <ComboBoxItem Content="Bottom left" />
+                        <ComboBoxItem Content="Bottom center" />
+                        <ComboBoxItem Content="Bottom right" />
+                    </ComboBox>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox x:Name="OffsetXBox" Tag="offsetX" Header="Offset X (px)" Minimum="-4000" Maximum="4000" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                        <NumberBox x:Name="OffsetYBox" Tag="offsetY" Grid.Column="1" Header="Offset Y (px)" Minimum="-4000" Maximum="4000" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Metrics" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <ComboBox x:Name="LayoutBox" Header="Layout" HorizontalAlignment="Stretch" SelectionChanged="OnLayoutChanged">
+                        <ComboBoxItem Content="Horizontal" />
+                        <ComboBoxItem Content="Vertical" />
+                        <ComboBoxItem Content="Compact" />
+                    </ComboBox>
+                    <StackPanel x:Name="ItemsPanel" Spacing="2" />
+                    <Button x:Name="AddItemButton" Content="Add metric">
+                        <Button.Flyout>
+                            <MenuFlyout x:Name="AddItemFlyout" Opening="OnAddItemMenuOpening" />
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Text" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="120" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="FontBox" Header="Font" IsEditable="True" HorizontalAlignment="Stretch" SelectionChanged="OnFontChanged" TextSubmitted="OnFontSubmitted" />
+                        <NumberBox x:Name="FontSizeBox" Tag="fontSize" Grid.Column="1" Header="Size" Minimum="8" Maximum="48" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="LabelColorButton">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border x:Name="LabelSwatch" Width="16" Height="16" CornerRadius="3" />
+                                <TextBlock Text="Label color" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout>
+                                    <ColorPicker x:Name="LabelColorPicker" Tag="label" IsAlphaEnabled="False" ColorChanged="OnColorChanged" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <Button x:Name="ValueColorButton">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border x:Name="ValueSwatch" Width="16" Height="16" CornerRadius="3" />
+                                <TextBlock Text="Value color" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <Flyout>
+                                    <ColorPicker x:Name="ValueColorPicker" Tag="value" IsAlphaEnabled="False" ColorChanged="OnColorChanged" />
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Background" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <Button x:Name="BackgroundColorButton">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border x:Name="BackgroundSwatch" Width="16" Height="16" CornerRadius="3" />
+                            <TextBlock Text="Background color" />
+                        </StackPanel>
+                        <Button.Flyout>
+                            <Flyout>
+                                <ColorPicker x:Name="BackgroundColorPicker" Tag="background" IsAlphaEnabled="False" ColorChanged="OnColorChanged" />
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Slider x:Name="OpacitySlider" Header="Opacity (%)" Minimum="0" Maximum="100" ValueChanged="OnOpacityChanged" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox x:Name="RadiusBox" Tag="radius" Header="Corner radius" Minimum="0" Maximum="32" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                        <NumberBox x:Name="PaddingBox" Tag="padding" Grid.Column="1" Header="Padding" Minimum="0" Maximum="48" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Frametime graph" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <ToggleSwitch x:Name="GraphSwitch" Header="Show graph" Toggled="OnGraphToggled" />
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <NumberBox x:Name="GraphWidthBox" Tag="graphWidth" Header="Width (px)" Minimum="40" Maximum="600" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                        <NumberBox x:Name="GraphHeightBox" Tag="graphHeight" Grid.Column="1" Header="Height (px)" Minimum="16" Maximum="200" SpinButtonPlacementMode="Compact" ValueChanged="OnNumberChanged" />
+                    </Grid>
+                </StackPanel>
+
+                <ComboBox x:Name="RefreshBox" Header="Refresh rate" HorizontalAlignment="Stretch" SelectionChanged="OnRefreshChanged">
+                    <ComboBoxItem Content="1 Hz" />
+                    <ComboBoxItem Content="2 Hz" />
+                    <ComboBoxItem Content="4 Hz" />
+                    <ComboBoxItem Content="10 Hz" />
+                    <ComboBoxItem Content="30 Hz" />
+                </ComboBox>
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Opacity="0.7"
+                    TextWrapping="Wrap"
+                    Text="With the frametime graph on, the overlay redraws at up to 30 Hz; otherwise it only redraws when a displayed value changes." />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="8">
+                <TextBlock Text="Preview" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <Border Background="#FF20242A" CornerRadius="8" Padding="24" MinHeight="200">
+                    <Image x:Name="PreviewImage" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                </Border>
+                <TextBlock
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Opacity="0.7"
+                    Text="The preview uses sample values and the same renderer as the overlay." />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

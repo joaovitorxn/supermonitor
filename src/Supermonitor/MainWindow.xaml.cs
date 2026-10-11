@@ -47,6 +47,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _closed = true;
+            (ContentFrame.Content as OverlayPage)?.Cleanup();
             ReleaseSensorLease();
             UpdateProcessLease();
         };
@@ -205,6 +206,9 @@ public sealed partial class MainWindow : Window
                 break;
             case "processes":
                 ContentFrame.Navigate(typeof(ProcessesPage), context);
+                break;
+            case "overlay":
+                ContentFrame.Navigate(typeof(OverlayPage), context);
                 break;
             case "settings":
                 ContentFrame.Navigate(typeof(SettingsPage), context);

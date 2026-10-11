@@ -4,6 +4,7 @@ using Supermonitor.Core;
 using Supermonitor.Core.Diagnostics;
 using Supermonitor.Core.Settings;
 using Supermonitor.Core.Shell;
+using Supermonitor.Overlay;
 
 namespace Supermonitor;
 
@@ -14,6 +15,7 @@ public partial class App : Application
     private DispatcherQueue? _dispatcher;
     private AppHost? _host;
     private TrayIcon? _tray;
+    private OverlayService? _overlay;
     private MainWindow? _window;
     private bool _exiting;
     private bool _settingsWarningShown;
@@ -36,6 +38,8 @@ public partial class App : Application
     public static new App Current => (App)Application.Current;
 
     public bool PawnIoBannerDismissed { get; set; }
+
+    public OverlayService? Overlay => _overlay;
 
     public bool ConsumeSettingsWarning()
     {
@@ -65,13 +69,16 @@ public partial class App : Application
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         _host = AppHost.Create();
         _host.Start();
+        _overlay = new OverlayService(_host);
         Appearance.AppearanceService.ApplyAccentResources(_host.Settings.Current.AccentColor);
 
         _tray = new TrayIcon(
             "Supermonitor",
             AppPaths.IconPath,
             onOpen: () => _dispatcher.TryEnqueue(ShowDashboard),
-            onExit: () => _dispatcher.TryEnqueue(ExitApp));
+            onExit: () => _dispatcher.TryEnqueue(ExitApp),
+            isOverlayEnabled: () => _overlay?.Enabled == true,
+            onToggleOverlay: () => _dispatcher.TryEnqueue(() => _overlay?.SetEnabled(_overlay.Enabled == false)));
         _instance.ListenForActivation(() => _dispatcher.TryEnqueue(ShowDashboard));
 
         var minimized = _args.Contains("--minimized", StringComparer.OrdinalIgnoreCase) || _host.Settings.Current.StartMinimized;
@@ -120,6 +127,7 @@ public partial class App : Application
         {
             _tray?.Dispose();
             _window?.Close();
+            _overlay?.Dispose();
             if (_host is not null)
             {
                 await _host.DisposeAsync();

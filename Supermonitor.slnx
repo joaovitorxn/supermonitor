@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Supermonitor.Core/Supermonitor.Core.csproj" />
+    <Project Path="src/Supermonitor.Overlay/Supermonitor.Overlay.csproj" />
     <Project Path="src/Supermonitor/Supermonitor.csproj">
       <Platform Project="x64" />
     </Project>

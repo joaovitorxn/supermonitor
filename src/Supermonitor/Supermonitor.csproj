@@ -28,5 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Supermonitor.Core\Supermonitor.Core.csproj" />
+    <ProjectReference Include="..\Supermonitor.Overlay\Supermonitor.Overlay.csproj" />
   </ItemGroup>
 </Project>

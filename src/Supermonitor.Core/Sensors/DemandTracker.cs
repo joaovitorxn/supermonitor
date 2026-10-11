@@ -4,15 +4,23 @@ public enum Demand
 {
     HardwareSensors,
     Processes,
+    FrameCapture,
 }
 
 public sealed class DemandTracker
 {
     private readonly int[] _counts = new int[Enum.GetValues<Demand>().Length];
 
+    // Disparado na thread de quem adquire/libera, quando a contagem de um Demand passa de 0 para 1 ou de 1 para 0.
+    public event Action<Demand, bool>? Changed;
+
     public IDisposable Acquire(Demand demand)
     {
-        Interlocked.Increment(ref _counts[(int)demand]);
+        if (Interlocked.Increment(ref _counts[(int)demand]) == 1)
+        {
+            Changed?.Invoke(demand, true);
+        }
+
         return new Lease(this, demand);
     }
 
@@ -24,9 +32,10 @@ public sealed class DemandTracker
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            if (Interlocked.Exchange(ref _disposed, 1) == 0
+                && Interlocked.Decrement(ref owner._counts[(int)demand]) == 0)
             {
-                Interlocked.Decrement(ref owner._counts[(int)demand]);
+                owner.Changed?.Invoke(demand, false);
             }
         }
     }

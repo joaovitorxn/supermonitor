@@ -10,7 +10,7 @@ public class AppSettingsTests
     {
         var settings = new AppSettings();
 
-        Assert.Equal(2, settings.Version);
+        Assert.Equal(3, settings.Version);
         Assert.Contains(settings.Cards, c => c.MetricId == MetricIds.CpuTemperature);
         Assert.Contains(settings.Cards, c => c.MetricId == MetricIds.GpuTemperature(0));
         Assert.Equal(80, settings.Thresholds[MetricIds.CpuTemperature].Warning);

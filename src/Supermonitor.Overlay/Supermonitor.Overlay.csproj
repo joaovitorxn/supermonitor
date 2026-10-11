@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Supermonitor.Overlay</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Supermonitor.Core\Supermonitor.Core.csproj" />
+  </ItemGroup>
+</Project>

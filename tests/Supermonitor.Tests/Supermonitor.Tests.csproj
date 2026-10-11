@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Supermonitor.Core\Supermonitor.Core.csproj" />
+    <ProjectReference Include="..\..\src\Supermonitor.Overlay\Supermonitor.Overlay.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

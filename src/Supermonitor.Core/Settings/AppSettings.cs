@@ -1,4 +1,5 @@
 using Supermonitor.Core.Metrics;
+using Supermonitor.Core.Overlay;
 
 namespace Supermonitor.Core.Settings;
 
@@ -35,6 +36,8 @@ public sealed class AppSettings
     public bool Fahrenheit { get; set; }
 
     public Dictionary<string, MetricThreshold> Thresholds { get; set; } = DefaultThresholds();
+
+    public OverlaySettings Overlay { get; set; } = new();
 
     public static List<CardSettings> DefaultCards() =>
     [
@@ -101,5 +104,8 @@ public sealed class AppSettings
                 (threshold.Warning, threshold.Critical) = (threshold.Critical, threshold.Warning);
             }
         }
+
+        Overlay ??= new OverlaySettings();
+        Overlay.Normalize();
     }
 }
