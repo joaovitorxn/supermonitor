@@ -59,6 +59,9 @@ public static class OverlayMetricCatalog
         _ => null,
     };
 
+    // FPS e 1% low pioram quando caem; os demais pioram quando sobem.
+    public static bool LowerIsWorse(OverlayMetric metric) => metric is OverlayMetric.Fps or OverlayMetric.Low1Percent;
+
     public static Demand? Demand(OverlayMetric metric) => metric switch
     {
         OverlayMetric.Fps or OverlayMetric.FrameTime or OverlayMetric.Low1Percent => Sensors.Demand.FrameCapture,

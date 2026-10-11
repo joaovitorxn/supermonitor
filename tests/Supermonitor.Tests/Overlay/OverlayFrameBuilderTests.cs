@@ -202,4 +202,40 @@ public class OverlayFrameBuilderTests
 
     private static OverlayFrame Build(OverlayStyle style, IOverlayValues values) =>
         OverlayFrameBuilder.Build(style, values, UnitOptions.Default, NoThresholds);
+
+    [Fact]
+    public void Frame_rate_thresholds_turn_the_value_warning_or_critical_when_it_drops_below_them()
+    {
+        var style = new OverlayStyle
+        {
+            Items = [new() { Metric = OverlayMetric.Fps, Threshold = new MetricThreshold { Warning = 60, Critical = 30 } }],
+        };
+        var values = new FakeValues();
+
+        values.Values[OverlayMetric.Fps] = 144;
+        var healthy = Build(style, values);
+        values.Values[OverlayMetric.Fps] = 50;
+        var low = Build(style, values);
+        values.Values[OverlayMetric.Fps] = 20;
+        var bad = Build(style, values);
+
+        Assert.Equal(new Rgba(0xFF, 0xFF, 0xFF), healthy.Rows[0].ValueColor);
+        Assert.Equal(OverlayFrameBuilder.WarningColor, low.Rows[0].ValueColor);
+        Assert.Equal(OverlayFrameBuilder.CriticalColor, bad.Rows[0].ValueColor);
+    }
+
+    [Fact]
+    public void Frame_time_thresholds_still_grow_worse_with_the_value()
+    {
+        var style = new OverlayStyle
+        {
+            Items = [new() { Metric = OverlayMetric.FrameTime, Threshold = new MetricThreshold { Warning = 20, Critical = 33 } }],
+        };
+        var values = new FakeValues();
+        values.Values[OverlayMetric.FrameTime] = 40;
+
+        var frame = Build(style, values);
+
+        Assert.Equal(OverlayFrameBuilder.CriticalColor, frame.Rows[0].ValueColor);
+    }
 }

@@ -192,4 +192,63 @@ public class OverlaySettingsTests
         Assert.Equal(30, loaded.Overlay.Style.Items[0].Threshold!.Warning);
         Assert.Equal("Mine", loaded.Overlay.UserPresets.Single().Name);
     }
+
+    [Fact]
+    public void Unknown_enum_names_in_the_file_are_normalized_without_losing_the_rest()
+    {
+        var dir = Directory.CreateTempSubdirectory("smtest");
+        try
+        {
+            var path = Path.Combine(dir.FullName, "settings.json");
+            File.WriteAllText(path, """
+                {
+                  "version": 3,
+                  "pingHost": "9.9.9.9",
+                  "overlay": {
+                    "enabled": true,
+                    "style": {
+                      "anchor": "Bogus",
+                      "layout": "Sideways",
+                      "items": [ { "metric": "LimiterState" }, { "metric": "Ping" } ]
+                    }
+                  }
+                }
+                """);
+            using var store = new SettingsStore(path, TimeProvider.System, TimeSpan.FromMilliseconds(500));
+
+            var result = store.Load();
+
+            Assert.Equal(SettingsLoadResult.Loaded, result);
+            Assert.Equal("9.9.9.9", store.Current.PingHost);
+            Assert.True(store.Current.Overlay.Enabled);
+            Assert.Equal(OverlayAnchor.TopLeft, store.Current.Overlay.Style.Anchor);
+            Assert.Equal(OverlayLayout.Vertical, store.Current.Overlay.Style.Layout);
+            Assert.Equal(new[] { OverlayMetric.Ping }, store.Current.Overlay.Style.Items.Select(i => i.Metric));
+            Assert.False(File.Exists(path + ".bak"));
+        }
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Normalize_keeps_frame_rate_thresholds_in_descending_order_and_sorts_the_others_ascending()
+    {
+        var style = new OverlayStyle
+        {
+            Items =
+            [
+                new() { Metric = OverlayMetric.Fps, Threshold = new MetricThreshold { Warning = 30, Critical = 60 } },
+                new() { Metric = OverlayMetric.Low1Percent, Threshold = new MetricThreshold { Warning = 60, Critical = 30 } },
+                new() { Metric = OverlayMetric.CpuTemperature, Threshold = new MetricThreshold { Warning = 90, Critical = 80 } },
+            ],
+        };
+
+        style.Normalize();
+
+        Assert.Equal((60f, 30f), (style.Items[0].Threshold!.Warning, style.Items[0].Threshold!.Critical));
+        Assert.Equal((60f, 30f), (style.Items[1].Threshold!.Warning, style.Items[1].Threshold!.Critical));
+        Assert.Equal((80f, 90f), (style.Items[2].Threshold!.Warning, style.Items[2].Threshold!.Critical));
+    }
 }

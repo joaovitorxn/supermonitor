@@ -31,7 +31,7 @@ public static class OverlayFrameBuilder
                 thresholds.TryGetValue(id, out threshold);
             }
 
-            valueColor = ThresholdEvaluator.Evaluate((float)value, threshold) switch
+            valueColor = ThresholdEvaluator.Evaluate((float)value, threshold, OverlayMetricCatalog.LowerIsWorse(item.Metric)) switch
             {
                 ThresholdLevel.Critical => CriticalColor,
                 ThresholdLevel.Warning => WarningColor,

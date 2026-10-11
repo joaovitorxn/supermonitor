@@ -37,7 +37,7 @@ public sealed partial class OverlayPage : Page
         _statusTimer = DispatcherQueue.CreateTimer();
         _statusTimer.Interval = TimeSpan.FromSeconds(1);
         _statusTimer.Tick += (_, _) => UpdateCaptureStatus();
-        Unloaded += OnUnloaded;
+        Unloaded += (_, _) => Cleanup();
     }
 
     private OverlaySettings Overlay => _host!.Settings.Current.Overlay;
@@ -59,7 +59,10 @@ public sealed partial class OverlayPage : Page
         _statusTimer.Start();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e)
+    protected override void OnNavigatedFrom(NavigationEventArgs e) => Cleanup();
+
+    // Idempotente: Unloaded pode não disparar quando a janela fecha, então a MainWindow também chama.
+    public void Cleanup()
     {
         _statusTimer.Stop();
         if (_overlay is not null)
@@ -67,6 +70,7 @@ public sealed partial class OverlayPage : Page
             _overlay.Changed -= OnOverlayChanged;
         }
 
+        _overlay = null;
         _renderer?.Dispose();
         _renderer = null;
     }

@@ -47,6 +47,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _closed = true;
+            (ContentFrame.Content as OverlayPage)?.Cleanup();
             ReleaseSensorLease();
             UpdateProcessLease();
         };

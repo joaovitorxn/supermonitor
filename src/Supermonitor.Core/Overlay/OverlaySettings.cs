@@ -1,7 +1,9 @@
+using System.Text.Json.Serialization;
 using Supermonitor.Core.Settings;
 
 namespace Supermonitor.Core.Overlay;
 
+[JsonConverter(typeof(LenientEnumConverter<OverlayAnchor>))]
 public enum OverlayAnchor
 {
     TopLeft,
@@ -15,6 +17,7 @@ public enum OverlayAnchor
     BottomRight,
 }
 
+[JsonConverter(typeof(LenientEnumConverter<OverlayLayout>))]
 public enum OverlayLayout
 {
     Horizontal,
@@ -22,6 +25,7 @@ public enum OverlayLayout
     Compact,
 }
 
+[JsonConverter(typeof(LenientEnumConverter<OverlayMetric>))]
 public enum OverlayMetric
 {
     Fps,
@@ -158,7 +162,9 @@ public sealed class OverlayStyle
                 {
                     item.Threshold = null;
                 }
-                else if (threshold.Warning > threshold.Critical)
+                else if (OverlayMetricCatalog.LowerIsWorse(item.Metric)
+                    ? threshold.Warning < threshold.Critical
+                    : threshold.Warning > threshold.Critical)
                 {
                     (threshold.Warning, threshold.Critical) = (threshold.Critical, threshold.Warning);
                 }

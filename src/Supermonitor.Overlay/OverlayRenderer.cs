@@ -218,7 +218,8 @@ public sealed class OverlayRenderer : IDisposable
         if (_target is null)
         {
             var properties = new RenderTargetProperties(
-                RenderTargetType.Default,
+                // Software: o overlay é pequeno, evita a leitura GPU→CPU a cada frame durante o jogo e não sofre perda de dispositivo (TDR).
+                RenderTargetType.Software,
                 new PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied),
                 0,
                 0,
