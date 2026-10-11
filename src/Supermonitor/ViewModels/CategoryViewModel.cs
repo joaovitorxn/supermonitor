@@ -23,7 +23,7 @@ public sealed class CategoryViewModel : IDisposable
     private int _refreshQueued;
     private int _descriptorCount = -1;
 
-    public CategoryViewModel(AppHost host, MetricCategory category, string title, DispatcherQueue dispatcher, Func<bool> isMinimized)
+    public CategoryViewModel(AppHost host, MetricCategory category, string title, DispatcherQueue dispatcher, Func<bool> isMinimized, Func<IDisposable> acquireProcesses)
     {
         _host = host;
         _dispatcher = dispatcher;
@@ -42,7 +42,7 @@ public sealed class CategoryViewModel : IDisposable
 
         if (ShowsProcesses)
         {
-            _processLease = host.Demand.Acquire(Demand.Processes);
+            _processLease = acquireProcesses();
             for (var i = 0; i < TopProcessCount; i++)
             {
                 TopProcesses.Add(new ProcessRowViewModel());

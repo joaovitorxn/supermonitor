@@ -31,7 +31,7 @@ public sealed partial class CategoryPage : Page
     {
         var context = (CategoryContext)e.Parameter;
         _host = context.Page.Host;
-        ViewModel = new CategoryViewModel(_host, context.Category, context.Title, DispatcherQueue, context.Page.IsMinimized);
+        ViewModel = new CategoryViewModel(_host, context.Category, context.Title, DispatcherQueue, context.Page.IsMinimized, context.Page.AcquireProcesses);
         MemoryBar.Visibility = ViewModel.IsMemory ? Visibility.Visible : Visibility.Collapsed;
         ProcessesPanel.Visibility = ViewModel.ShowsProcesses ? Visibility.Visible : Visibility.Collapsed;
         ViewModel.MemoryUpdated += OnMemoryUpdated;

@@ -23,7 +23,7 @@ public sealed partial class ProcessesPage : Page
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         var context = (PageContext)e.Parameter;
-        ViewModel = new ProcessesViewModel(context.Host, DispatcherQueue, context.IsMinimized);
+        ViewModel = new ProcessesViewModel(context.Host, DispatcherQueue, context.IsMinimized, context.AcquireProcesses);
         Bindings.Update();
     }
 

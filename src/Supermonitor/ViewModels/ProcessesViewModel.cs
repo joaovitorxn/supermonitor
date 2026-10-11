@@ -18,13 +18,13 @@ public sealed partial class ProcessesViewModel : ObservableObject, IDisposable
     private readonly IDisposable _lease;
     private int _refreshQueued;
 
-    public ProcessesViewModel(AppHost host, DispatcherQueue dispatcher, Func<bool> isMinimized)
+    public ProcessesViewModel(AppHost host, DispatcherQueue dispatcher, Func<bool> isMinimized, Func<IDisposable> acquireProcesses)
     {
         _host = host;
         _dispatcher = dispatcher;
         _isMinimized = isMinimized;
         _refreshHandler = RefreshNow;
-        _lease = host.Demand.Acquire(Demand.Processes);
+        _lease = acquireProcesses();
         CountText = string.Empty;
         host.Hub.SampleReady += OnSampleReady;
     }

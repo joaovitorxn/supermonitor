@@ -13,6 +13,7 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
 
     // Última posição por card; o elemento é recriado no reordenamento, então a chave é o MetricId.
     private readonly Dictionary<string, Point> _lastPositions = [];
+    private string[] _lastOrder = [];
 
     protected override Size MeasureOverride(NonVirtualizingLayoutContext context, Size availableSize) =>
         Place(context, availableSize.Width, arrange: false);
@@ -23,7 +24,11 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
     private Size Place(NonVirtualizingLayoutContext context, double width, bool arrange)
     {
         double x = 0, y = 0, rowHeight = 0, usedWidth = 0;
-        foreach (var child in InItemOrder(context.Children))
+        var ordered = InItemOrder(context.Children).ToArray();
+        var order = arrange ? ordered.Select(IdOf).ToArray() : _lastOrder;
+        // Só anima quando a ordem muda (reordenação); redimensionar a janela reposiciona sem deslizar.
+        var animate = arrange && !order.SequenceEqual(_lastOrder);
+        foreach (var child in ordered)
         {
             if (!arrange)
             {
@@ -41,12 +46,27 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
             if (arrange)
             {
                 child.Arrange(new Rect(x, y, size.Width, size.Height));
-                SlideFromPrevious(child, new Point(x, y));
+                SlideFromPrevious(child, new Point(x, y), animate);
             }
 
             x += size.Width + Spacing;
             rowHeight = Math.Max(rowHeight, size.Height);
             usedWidth = Math.Max(usedWidth, x - Spacing);
+        }
+
+        if (arrange)
+        {
+            // Cards removidos saem do dicionário; reordenar mantém o conjunto de ids e preserva as posições.
+            if (order.Length != _lastOrder.Length)
+            {
+                var present = order.ToHashSet();
+                foreach (var stale in _lastPositions.Keys.Where(k => !present.Contains(k)).ToList())
+                {
+                    _lastPositions.Remove(stale);
+                }
+            }
+
+            _lastOrder = order;
         }
 
         return new Size(double.IsInfinity(width) ? usedWidth : width, y + rowHeight);
@@ -64,14 +84,16 @@ public sealed partial class CardWrapLayout : NonVirtualizingLayout
         return true;
     }
 
-    private void SlideFromPrevious(UIElement child, Point position)
+    private static string IdOf(UIElement child) => child is MetricCard { ViewModel: { } vm } ? vm.MetricId : string.Empty;
+
+    private void SlideFromPrevious(UIElement child, Point position, bool animate)
     {
         if (child is not MetricCard { ViewModel: { } vm })
         {
             return;
         }
 
-        if (_lastPositions.TryGetValue(vm.MetricId, out var previous)
+        if (animate && _lastPositions.TryGetValue(vm.MetricId, out var previous)
             && (Math.Abs(previous.X - position.X) > 0.5 || Math.Abs(previous.Y - position.Y) > 0.5))
         {
             ElementCompositionPreview.SetIsTranslationEnabled(child, true);

@@ -21,6 +21,9 @@ public sealed partial class MainWindow : Window
     private bool _lastMinimized;
     private IDisposable? _sensorLease;
     private bool _pawnIoReady;
+    private bool _closed;
+    private int _processConsumers;
+    private IDisposable? _processLease;
 
     public MainWindow(AppHost host)
     {
@@ -41,11 +44,17 @@ public sealed partial class MainWindow : Window
         PawnIoInfoBar.IsOpen = !HardwareProvider.IsPawnIoInstalled && !App.Current.PawnIoBannerDismissed;
         Nav.SelectedItem = Nav.MenuItems[0];
 
-        Closed += (_, _) => ReleaseSensorLease();
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            ReleaseSensorLease();
+            UpdateProcessLease();
+        };
         UpdateSensorLease();
     }
 
-    public bool IsMinimized => AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
+    // Janela fechada conta como minimizada: os view models das páginas viram no-ops mesmo que Unloaded não dispare.
+    public bool IsMinimized => _closed || AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized };
 
     public void BringToFront()
     {
@@ -66,6 +75,7 @@ public sealed partial class MainWindow : Window
             _lastMinimized = minimized;
             ProcessEfficiency.SetEfficiencyMode(minimized);
             UpdateSensorLease();
+            UpdateProcessLease();
         }
     }
 
@@ -97,7 +107,7 @@ public sealed partial class MainWindow : Window
             else
             {
                 PawnIoInfoBar.Severity = InfoBarSeverity.Error;
-                PawnIoInfoBar.Message = $"Installation failed (winget exit code {exitCode}). You can install PawnIO manually from pawnio.eu.";
+                PawnIoInfoBar.Message = $"{(exitCode == -1 ? "Installation timed out." : $"Installation failed (winget exit code {exitCode}).")} You can install PawnIO manually from pawnio.eu.";
                 PawnIoButton.Content = "Try again";
             }
         }
@@ -125,6 +135,40 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    // Páginas pedem processos por aqui; a lease real só existe com janela visível e ao menos uma página interessada.
+    private IDisposable AcquireProcesses()
+    {
+        _processConsumers++;
+        UpdateProcessLease();
+        return new ProcessToken(this);
+    }
+
+    private void ReleaseProcessConsumer()
+    {
+        _processConsumers--;
+        UpdateProcessLease();
+    }
+
+    private void UpdateProcessLease()
+    {
+        if (_processConsumers > 0 && !IsMinimized)
+        {
+            _processLease ??= _host.Demand.Acquire(Demand.Processes);
+        }
+        else
+        {
+            _processLease?.Dispose();
+            _processLease = null;
+        }
+    }
+
+    private sealed class ProcessToken(MainWindow owner) : IDisposable
+    {
+        private MainWindow? _owner = owner;
+
+        public void Dispose() => Interlocked.Exchange(ref _owner, null)?.ReleaseProcessConsumer();
+    }
+
     private void ReleaseSensorLease()
     {
         _sensorLease?.Dispose();
@@ -133,7 +177,7 @@ public sealed partial class MainWindow : Window
 
     private void OnNavSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        var context = new PageContext(_host, () => IsMinimized);
+        var context = new PageContext(_host, () => IsMinimized, AcquireProcesses);
         Navigate(args.IsSettingsSelected ? "settings" : (args.SelectedItem as NavigationViewItem)?.Tag as string, context);
     }
 
