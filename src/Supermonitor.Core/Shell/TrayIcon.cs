@@ -7,21 +7,26 @@ public sealed unsafe class TrayIcon : IDisposable
     private const uint CallbackMessage = User32.WM_APP + 1;
     private const int MenuOpen = 1;
     private const int MenuExit = 2;
+    private const int MenuOverlay = 3;
     private const nuint RetryTimerId = 1;
     private const uint RetryIntervalMs = 2000;
 
     private readonly string _tooltip;
     private readonly Action _onOpen;
     private readonly Action _onExit;
+    private readonly Func<bool>? _isOverlayEnabled;
+    private readonly Action? _onToggleOverlay;
     private readonly uint _taskbarCreated;
     private readonly nint _icon;
     private readonly HiddenWindow _window;
 
-    public TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit)
+    public TrayIcon(string tooltip, string iconPath, Action onOpen, Action onExit, Func<bool>? isOverlayEnabled = null, Action? onToggleOverlay = null)
     {
         _tooltip = tooltip;
         _onOpen = onOpen;
         _onExit = onExit;
+        _isOverlayEnabled = isOverlayEnabled;
+        _onToggleOverlay = onToggleOverlay;
         _taskbarCreated = User32.RegisterWindowMessageW("TaskbarCreated");
         _icon = User32.LoadImageW(0, iconPath, User32.IMAGE_ICON, User32.GetSystemMetrics(User32.SM_CXSMICON), User32.GetSystemMetrics(User32.SM_CYSMICON), User32.LR_LOADFROMFILE);
         _window = new HiddenWindow("Supermonitor.Tray", HandleMessage);
@@ -103,6 +108,12 @@ public sealed unsafe class TrayIcon : IDisposable
     {
         var menu = User32.CreatePopupMenu();
         User32.AppendMenuW(menu, User32.MF_STRING, MenuOpen, "Open Supermonitor");
+        if (_onToggleOverlay is not null)
+        {
+            var flags = User32.MF_STRING | (_isOverlayEnabled?.Invoke() == true ? User32.MF_CHECKED : 0);
+            User32.AppendMenuW(menu, flags, MenuOverlay, "Show overlay");
+        }
+
         User32.AppendMenuW(menu, User32.MF_SEPARATOR, 0, null);
         User32.AppendMenuW(menu, User32.MF_STRING, MenuExit, "Exit");
 
@@ -119,6 +130,10 @@ public sealed unsafe class TrayIcon : IDisposable
         else if (command == MenuExit)
         {
             _onExit();
+        }
+        else if (command == MenuOverlay)
+        {
+            _onToggleOverlay?.Invoke();
         }
     }
 }

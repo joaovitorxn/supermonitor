@@ -11,6 +11,7 @@ internal static unsafe partial class User32
     public const uint WM_LBUTTONDBLCLK = 0x0203;
     public const uint WM_APP = 0x8000;
     public const uint MF_STRING = 0x0000;
+    public const uint MF_CHECKED = 0x0008;
     public const uint MF_SEPARATOR = 0x0800;
     public const uint TPM_RIGHTBUTTON = 0x0002;
     public const uint TPM_NONOTIFY = 0x0080;
